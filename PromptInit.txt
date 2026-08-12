@@ -1,0 +1,1253 @@
+# Projet : HomeDash - Dashboard domestique modulaire sur tablette Android
+
+Je souhaite que tu m'accompagnes dans la conception et le développement d'un projet personnel complet appelé provisoirement **HomeDash**.
+
+Avant de commencer à coder massivement, analyse ce cahier des charges, inspecte l'environnement et le repository existant s'il y en a un, puis propose une architecture technique cohérente.
+
+Tu peux remettre en question certains choix décrits ci-dessous si une meilleure solution existe, mais explique brièvement pourquoi avant d'effectuer un changement architectural important.
+
+L'objectif est de construire d'abord un **MVP fonctionnel et propre**, tout en concevant dès le départ une architecture suffisamment modulaire pour faire évoluer le projet pendant plusieurs années sans devoir tout réécrire.
+
+---
+
+# 1. OBJECTIF GÉNÉRAL
+
+Je veux créer un dashboard domestique affiché en permanence sur une tablette tactile fixée au mur dans l'entrée de ma maison.
+
+Matériel actuel :
+
+* tablette : qunyiCO Y10 ;
+* Android 10 ;
+* tablette fixée au mur ;
+* tablette alimentée en permanence ;
+* tablette entièrement dédiée au dashboard ;
+* Raspberry Pi disponible dans la maison et pouvant fonctionner 24 h/24 ;
+* ordinateur personnel utilisé pour le développement ;
+* Git/GitHub pour versionner et distribuer les nouvelles versions.
+
+Le dashboard doit afficher différentes informations domestiques sous forme de **widgets/modules indépendants**.
+
+Exemples :
+
+* heure ;
+* date ;
+* météo ;
+* prévisions météo ;
+* températures intérieure/extérieure ;
+* Google Calendar ;
+* notes ;
+* état du réseau ;
+* informations système ;
+* futurs capteurs domotiques.
+
+Le système est destiné uniquement à mon domicile. Il n'est pas nécessaire de concevoir une infrastructure SaaS, multi-tenant ou destinée à des milliers d'utilisateurs.
+
+Je privilégie :
+
+1. simplicité ;
+2. fiabilité ;
+3. modularité ;
+4. fonctionnement local ;
+5. maintenance facile ;
+6. faible consommation de ressources ;
+7. sécurité ;
+8. facilité d'ajout de nouveaux modules.
+
+---
+
+# 2. ARCHITECTURE ENVISAGÉE
+
+L'architecture privilégiée est la suivante :
+
+PC de développement
+↓
+Git / GitHub
+↓
+Raspberry Pi
+↓
+Application/dashboard local
+↓
+Tablette Android en mode kiosque
+
+Le Raspberry Pi doit servir de serveur central.
+
+Il hébergera notamment :
+
+* le frontend du dashboard ;
+* le backend/API ;
+* les données persistantes ;
+* les configurations ;
+* les intégrations avec les services externes ;
+* les intégrations avec les futurs capteurs ;
+* le système de mise à jour ;
+* éventuellement MQTT.
+
+La tablette doit principalement servir de client/interface.
+
+Je privilégie une architecture :
+
+**Web application locale + application Android légère servant de conteneur/kiosque**
+
+L'application Android pourrait charger le dashboard hébergé sur le Raspberry Pi via WebView ou une solution équivalente.
+
+Cette couche Android doit uniquement être utilisée lorsqu'elle apporte quelque chose que le navigateur ne peut pas faire correctement :
+
+* mode kiosque ;
+* plein écran ;
+* gestion écran allumé/éteint ;
+* caméra/détection de présence ;
+* informations système de la tablette ;
+* communication native avec Android ;
+* éventuellement démarrage automatique après reboot.
+
+Si une meilleure architecture existe, propose-la et justifie-la.
+
+---
+
+# 3. FONCTIONNEMENT LOCAL
+
+Le dashboard doit être conçu selon une approche **local-first**.
+
+Il doit continuer à fonctionner sur le réseau local lorsque la connexion Internet est coupée.
+
+Les fonctionnalités nécessitant Internet peuvent évidemment devenir temporairement indisponibles :
+
+* Google Calendar ;
+* récupération de données météo distantes ;
+* recherche de mises à jour GitHub ;
+* autres API Internet.
+
+En revanche, doivent continuer à fonctionner :
+
+* interface ;
+* configuration ;
+* widgets locaux ;
+* notes ;
+* données précédemment mises en cache ;
+* capteurs locaux ;
+* informations réseau ;
+* navigation ;
+* mode édition.
+
+Le dashboard ne doit PAS dépendre d'un serveur cloud personnel.
+
+---
+
+# 4. SYSTÈME DE WIDGETS
+
+C'est une partie fondamentale du projet.
+
+Je veux une véritable architecture modulaire.
+
+Chaque fonctionnalité du dashboard doit autant que possible être développée sous forme de **widget indépendant**.
+
+Exemple conceptuel :
+
+widgets/
+clock/
+weather/
+calendar/
+temperature/
+notes/
+network/
+system/
+
+L'architecture exacte est à déterminer selon la stack choisie.
+
+Chaque widget devrait idéalement déclarer des métadonnées telles que :
+
+* identifiant ;
+* nom ;
+* description ;
+* icône ;
+* version ;
+* dimensions minimales ;
+* dimensions par défaut ;
+* dimensions maximales éventuelles ;
+* paramètres configurables ;
+* permissions/capacités nécessaires ;
+* composant frontend ;
+* éventuel backend associé.
+
+Je veux pouvoir plus tard demander :
+
+"Crée un widget affichant les prochains trains."
+
+ou :
+
+"Crée un widget affichant la qualité de l'air."
+
+et pouvoir l'intégrer facilement sans modifier profondément le coeur du dashboard.
+
+Prévoir une documentation claire expliquant comment développer un nouveau widget.
+
+Éviter cependant une architecture de plugins excessivement complexe pour le MVP. Je veux une modularité propre, pas un framework inutilement abstrait.
+
+---
+
+# 5. INTERFACE PRINCIPALE
+
+L'interface doit être :
+
+* blanche ;
+* sobre ;
+* moderne ;
+* minimaliste ;
+* très lisible ;
+* pensée pour une tablette tactile ;
+* utilisable à quelques mètres de distance.
+
+Le dashboard doit utiliser une grille responsive.
+
+Chaque widget apparaît dans une carte/cadre.
+
+Exemple :
+
+┌──────────────┐ ┌────────────────────┐
+│    Heure     │ │      Météo         │
+│    20:42     │ │  23°C - Strasbourg │
+└──────────────┘ └────────────────────┘
+
+┌───────────────────────────────┐
+│        Google Calendar        │
+│                               │
+└───────────────────────────────┘
+
+Les widgets doivent pouvoir avoir différentes dimensions.
+
+---
+
+# 6. MODE NORMAL ET MODE ÉDITION
+
+Deux modes doivent exister.
+
+## Mode normal
+
+Interface propre.
+
+Les widgets sont verrouillés.
+
+Aucune poignée de redimensionnement ou bouton de suppression ne doit encombrer l'interface.
+
+## Mode édition
+
+Un bouton permet de passer en mode édition.
+
+Dans ce mode, l'utilisateur peut :
+
+* déplacer un widget par drag-and-drop tactile ;
+* redimensionner un widget ;
+* supprimer un widget ;
+* ajouter un widget ;
+* configurer un widget ;
+* changer de page ;
+* créer une page ;
+* supprimer une page ;
+* renommer une page.
+
+La disposition doit être persistante.
+
+Après redémarrage du Raspberry Pi ou de la tablette, le dashboard doit retrouver exactement sa configuration.
+
+Prévoir un moyen simple d'annuler les modifications ou de restaurer une disposition précédente si cela reste raisonnable pour le MVP.
+
+---
+
+# 7. PAGES
+
+Le système doit supporter plusieurs pages.
+
+La première est :
+
+**Accueil**
+
+Elle doit contenir les informations principales.
+
+À terme, je veux pouvoir créer par exemple :
+
+* Accueil ;
+* Météo ;
+* Calendriers ;
+* Maison ;
+* Réseau ;
+* Tâches.
+
+Il faut pouvoir naviguer facilement entre elles avec une interface tactile.
+
+Pour le MVP, l'Accueil reste prioritaire.
+
+L'architecture doit néanmoins gérer les pages dès le départ afin de ne pas devoir restructurer tout le système ultérieurement.
+
+---
+
+# 8. WIDGETS DU MVP
+
+Créer au minimum les widgets suivants.
+
+## 8.1 Heure et date
+
+Afficher :
+
+* heure ;
+* date ;
+* jour de la semaine.
+
+Configuration possible :
+
+* format 12/24 h ;
+* affichage des secondes ou non ;
+* éventuellement taille/format.
+
+Le fuseau horaire doit être configurable.
+
+---
+
+## 8.2 Météo actuelle
+
+Afficher au minimum :
+
+* température ;
+* météo actuelle ;
+* icône ;
+* température ressentie ;
+* humidité si disponible ;
+* vent ;
+* localisation ;
+* heure de dernière actualisation.
+
+Choisir une API météo pertinente avec un niveau gratuit suffisant ou, de préférence, une source ne nécessitant pas d'abonnement payant.
+
+Les appels API doivent être effectués intelligemment et mis en cache.
+
+Ne jamais exposer une clé API sensible dans le frontend.
+
+---
+
+## 8.3 Prévisions météo
+
+Afficher les prochaines heures et/ou prochains jours.
+
+Le widget doit être responsive selon sa taille.
+
+Petit widget :
+informations essentielles.
+
+Grand widget :
+davantage de prévisions.
+
+---
+
+## 8.4 Google Calendar
+
+Créer une intégration Google Calendar propre utilisant OAuth 2.0.
+
+Fonctions souhaitées :
+
+* authentification avec mon compte Google ;
+* affichage des calendriers autorisés ;
+* événements du jour ;
+* événements à venir ;
+* consultation d'un événement ;
+* création d'événement ;
+* modification d'événement ;
+* suppression d'événement.
+
+Les tokens OAuth doivent être stockés côté serveur de manière sécurisée.
+
+Aucun secret Google ne doit être envoyé dans le frontend ou commité dans Git.
+
+Prévoir une interface adaptée au tactile.
+
+---
+
+## 8.5 Température intérieure
+
+Créer un widget capable d'afficher les données provenant de futurs capteurs.
+
+Je ne possède pas encore les capteurs.
+
+Le système doit donc définir une abstraction générique de "sensor".
+
+Exemple :
+
+sensor.id
+sensor.name
+sensor.type
+sensor.value
+sensor.unit
+sensor.timestamp
+sensor.status
+
+Prévoir plusieurs moyens d'alimenter les capteurs, notamment si pertinent :
+
+* HTTP API ;
+* MQTT ;
+* ESPHome-compatible data path ;
+* capteurs ESP32/ESP8266 ;
+* autres sources futures.
+
+Pour le développement, fournir un capteur simulé/mock.
+
+---
+
+## 8.6 Température extérieure
+
+Même architecture que les capteurs intérieurs.
+
+La température extérieure provenant d'un capteur physique doit pouvoir être différenciée de la température fournie par l'API météo.
+
+---
+
+## 8.7 Notes
+
+Widget simple permettant :
+
+* afficher une note ;
+* modifier la note depuis la tablette ;
+* sauvegarde automatique ;
+* fonctionnement sans Internet.
+
+Prévoir plusieurs notes si cela ne complexifie pas inutilement le MVP.
+
+---
+
+## 8.8 État du réseau
+
+Créer un widget donnant quelques informations utiles :
+
+* connexion Internet disponible ou non ;
+* latence approximative ;
+* état du Raspberry Pi ;
+* adresse IP locale ;
+* uptime ;
+* éventuellement débit ou autres métriques si elles sont réellement mesurables proprement.
+
+Ne pas inventer des métriques impossibles à obtenir de manière fiable.
+
+---
+
+## 8.9 Informations système
+
+Afficher certaines informations provenant du Raspberry Pi :
+
+* CPU ;
+* RAM ;
+* stockage ;
+* température CPU ;
+* uptime.
+
+Prévoir également un mécanisme permettant à l'application Android de transmettre au serveur certaines informations de la tablette si Android les expose :
+
+* batterie ;
+* état de charge ;
+* température de batterie si disponible ;
+* éventuellement température système si disponible ;
+* uptime ou autres données pertinentes.
+
+Ne pas supposer qu'Android expose une température CPU générique si ce n'est pas réellement disponible sur cet appareil.
+
+---
+
+# 9. FUTURS WIDGETS
+
+L'architecture doit pouvoir accueillir ultérieurement :
+
+* radar météo ;
+* carte des nuages ;
+* carte des précipitations ;
+* qualité de l'air ;
+* Todo List ;
+* liste de courses ;
+* trafic ;
+* transports ;
+* horaires de trains ;
+* consommation électrique ;
+* appareils connectés ;
+* contrôle de lumières ;
+* état de serveurs ;
+* NAS ;
+* caméras ;
+* actualités ;
+* RSS ;
+* statistiques personnalisées ;
+* calendrier familial ;
+* rappels ;
+* musique ;
+* minuteurs ;
+* informations provenant d'API personnalisées.
+
+Ne pas nécessairement développer ces widgets maintenant.
+
+Il faut seulement s'assurer que l'architecture permet leur ajout.
+
+---
+
+# 10. DÉTECTION DE PRÉSENCE
+
+La tablette est branchée 24 h/24 mais son écran ne doit pas rester allumé en permanence.
+
+Objectif :
+
+aucune présence
+→
+écran éteint
+
+personne détectée devant la tablette
+→
+écran allumé
+
+aucune présence pendant environ 60 secondes
+→
+écran éteint
+
+Le toucher de l'écran doit également pouvoir réveiller le système si Android le permet.
+
+La caméra frontale peut être utilisée.
+
+IMPORTANT :
+
+Je ne veux PAS de reconnaissance faciale.
+
+Je veux uniquement détecter la présence d'une personne ou un mouvement suffisamment fiable.
+
+Le traitement doit être effectué localement.
+
+Aucune image de caméra ne doit :
+
+* être enregistrée ;
+* être envoyée sur Internet ;
+* être envoyée au Raspberry Pi sauf nécessité technique clairement justifiée.
+
+Privilégier le traitement directement sur la tablette.
+
+Étudier les contraintes Android 10 concernant :
+
+* caméra en arrière-plan ;
+* verrouillage/déverrouillage ;
+* extinction réelle de l'écran ;
+* permissions ;
+* Device Admin / Device Owner ;
+* mode kiosque ;
+* WakeLock ;
+* réveil de l'écran.
+
+Ne contourne pas artificiellement les restrictions Android.
+
+Si Android empêche une partie exacte du comportement demandé, explique la limitation et implémente l'alternative techniquement la plus propre.
+
+La détection ne doit pas utiliser inutilement beaucoup de CPU ou de batterie.
+
+---
+
+# 11. MODE KIOSQUE ANDROID
+
+La tablette est exclusivement dédiée à HomeDash.
+
+Créer si nécessaire une application Android légère.
+
+Objectifs :
+
+* lancement automatique ;
+* plein écran immersif ;
+* masquer autant que raisonnablement possible les éléments Android inutiles ;
+* charger automatiquement HomeDash ;
+* reconnexion automatique au Raspberry Pi ;
+* gestion des erreurs réseau ;
+* affichage d'une page propre si le Raspberry Pi est inaccessible ;
+* détection de présence ;
+* gestion écran ;
+* remontée des informations système disponibles ;
+* actualisation du dashboard après mise à jour.
+
+L'application doit cibler Android 10 tout en restant aussi propre et moderne que possible.
+
+---
+
+# 12. COMMUNICATION TABLETTE ↔ RASPBERRY PI
+
+Définir une API propre.
+
+Selon les besoins, utiliser :
+
+* REST ;
+* WebSocket ;
+* éventuellement MQTT.
+
+Éviter de multiplier inutilement les protocoles.
+
+Les mises à jour temps réel comme les capteurs peuvent utiliser WebSocket ou MQTT si pertinent.
+
+Documenter les endpoints et messages.
+
+---
+
+# 13. MISES À JOUR
+
+Je veux développer sur mon PC puis déployer via Git.
+
+Workflow :
+
+développement PC
+→
+tests
+→
+commit
+→
+push GitHub
+→
+Raspberry Pi
+
+IMPORTANT :
+
+Le Raspberry Pi ne doit pas automatiquement installer chaque push.
+
+Je veux des mises à jour **manuelles**.
+
+Le dashboard doit disposer d'une section :
+
+**Paramètres → Mises à jour**
+
+avec un bouton :
+
+**Rechercher les mises à jour**
+
+Le serveur vérifie alors le repository configuré.
+
+Si aucune mise à jour :
+
+"HomeDash est à jour."
+
+Si une nouvelle version existe :
+
+afficher par exemple :
+
+Version installée : 0.1.0
+Version disponible : 0.2.0
+
+et éventuellement :
+
+* date ;
+* changelog ;
+* commit/tag correspondant.
+
+Puis bouton :
+
+**Installer la mise à jour**
+
+L'installation doit idéalement :
+
+1. sauvegarder l'état/configuration nécessaire ;
+2. récupérer la version ;
+3. installer les dépendances si nécessaire ;
+4. effectuer les migrations éventuelles ;
+5. reconstruire le frontend ;
+6. redémarrer les services ;
+7. effectuer un health check ;
+8. revenir automatiquement à l'ancienne version si la nouvelle version ne démarre pas correctement.
+
+Éviter absolument un simple "git pull && restart" sans mécanisme de sécurité.
+
+Étudier l'utilisation de :
+
+* tags/releases Git ;
+* versioning sémantique ;
+* Docker/Docker Compose ;
+* images/version précédente ;
+* mécanisme de rollback.
+
+Choisir la solution la plus simple et fiable pour un Raspberry Pi personnel.
+
+Le système de mise à jour lui-même doit être conçu avec prudence afin qu'une mise à jour défectueuse ne rende pas le dashboard inutilisable.
+
+---
+
+# 14. VERSIONING
+
+Utiliser Semantic Versioning :
+
+MAJOR.MINOR.PATCH
+
+Exemples :
+
+0.1.0
+0.2.0
+0.2.1
+1.0.0
+
+Prévoir un endroit central définissant la version actuelle.
+
+---
+
+# 15. STOCKAGE
+
+Choisir un stockage local léger.
+
+SQLite est probablement suffisant.
+
+À confirmer selon l'architecture.
+
+Les données à stocker incluent potentiellement :
+
+* pages ;
+* widgets ;
+* positions ;
+* dimensions ;
+* configurations ;
+* notes ;
+* capteurs ;
+* préférences ;
+* paramètres ;
+* informations d'intégration ;
+* tokens OAuth de manière sécurisée ;
+* historique minimal si nécessaire.
+
+Éviter une infrastructure de base de données inutilement lourde.
+
+Prévoir les migrations de schéma.
+
+---
+
+# 16. CONFIGURATION ET SECRETS
+
+Aucun secret ne doit être commité.
+
+Utiliser selon la stack :
+
+.env
+.env.example
+
+ou système équivalent.
+
+.gitignore doit exclure les secrets.
+
+Créer une documentation expliquant :
+
+* quelles variables sont nécessaires ;
+* comment créer les credentials Google OAuth ;
+* comment configurer les API ;
+* comment configurer le Raspberry Pi ;
+* comment connecter la tablette.
+
+---
+
+# 17. SÉCURITÉ
+
+Même si le projet fonctionne uniquement sur mon LAN, appliquer des règles raisonnables de sécurité.
+
+Notamment :
+
+* validation des entrées ;
+* protection des endpoints sensibles ;
+* pas de secrets frontend ;
+* stockage sécurisé des tokens ;
+* limitation des commandes système ;
+* éviter les injections de commandes ;
+* système de mise à jour sécurisé ;
+* aucune exécution arbitraire provenant du frontend.
+
+Les opérations sensibles comme l'installation d'une mise à jour ne doivent pas pouvoir être déclenchées trivialement par n'importe quel appareil du réseau.
+
+Prévoir une authentification locale légère ou un mécanisme équivalent pour les opérations administratives.
+
+Ne pas complexifier inutilement l'utilisation quotidienne du dashboard.
+
+---
+
+# 18. CAPTEURS FUTURS
+
+Je souhaite rester indépendant d'un service cloud obligatoire.
+
+Ne pas rendre Home Assistant obligatoire.
+
+L'architecture doit pouvoir fonctionner directement avec des appareils locaux.
+
+Pour de futurs capteurs de température/humidité, envisager notamment :
+
+ESP32 + capteur température/humidité
+→
+Wi-Fi local
+→
+MQTT ou HTTP
+→
+Raspberry Pi
+→
+HomeDash
+
+Concevoir HomeDash pour qu'un nouveau capteur puisse être ajouté sans modifier le coeur du système.
+
+Prévoir dans la documentation une section expliquant les types de matériel recommandés et les protocoles compatibles.
+
+---
+
+# 19. HOME ASSISTANT
+
+Home Assistant ne doit PAS être une dépendance.
+
+Cependant, concevoir éventuellement une intégration optionnelle future.
+
+Ainsi HomeDash doit fonctionner :
+
+sans Home Assistant
+
+mais pourrait plus tard récupérer des données depuis Home Assistant si je décide de l'utiliser.
+
+---
+
+# 20. CACHE ET GESTION DES ERREURS
+
+Les widgets doivent gérer correctement les erreurs.
+
+Exemple météo :
+
+si Internet tombe, ne pas remplacer immédiatement le widget par une grosse erreur.
+
+Afficher plutôt les dernières données connues avec :
+
+"Dernière mise à jour : 18:42"
+
+et éventuellement une petite indication hors ligne.
+
+Chaque widget doit pouvoir gérer :
+
+* loading ;
+* ready ;
+* stale ;
+* error ;
+* offline.
+
+Une erreur dans un widget ne doit jamais faire planter tout le dashboard.
+
+---
+
+# 21. PERFORMANCE
+
+Le matériel n'est pas extrêmement puissant.
+
+Optimiser pour :
+
+* Raspberry Pi ;
+* tablette Android 10 relativement modeste ;
+* fonctionnement 24/7.
+
+Éviter :
+
+* animations lourdes ;
+* polling excessif ;
+* dépendances gigantesques sans justification ;
+* rafraîchissements inutiles ;
+* traitement caméra trop lourd ;
+* memory leaks.
+
+Les widgets doivent définir une stratégie raisonnable de rafraîchissement.
+
+Exemple :
+
+heure → localement
+météo → toutes les X minutes
+capteurs → événementiel ou quelques secondes
+Google Calendar → périodiquement + rafraîchissement manuel
+système → quelques secondes
+
+---
+
+# 22. STACK TECHNIQUE
+
+Choisis une stack moderne, maintenable et raisonnablement légère.
+
+Je suis développeur et je veux pouvoir continuer le développement moi-même avec Codex.
+
+Quelques possibilités :
+
+Frontend :
+
+* React ;
+* TypeScript ;
+* Vite ;
+* bibliothèque de grille adaptée au tactile.
+
+Backend :
+
+* Node.js + TypeScript ;
+* Fastify ou Express ;
+* ou autre solution justifiée.
+
+Stockage :
+
+* SQLite.
+
+Déploiement :
+
+* Docker Compose si cela améliore réellement la reproductibilité et les rollbacks.
+
+Android :
+
+* Kotlin ;
+* WebView ;
+* composants natifs uniquement pour les fonctions nécessaires.
+
+Ne choisis pas une technologie uniquement parce qu'elle est populaire.
+
+Justifie les principales dépendances.
+
+---
+
+# 23. STRUCTURE DU REPOSITORY
+
+Je souhaite idéalement un monorepo clair, par exemple :
+
+homedash/
+apps/
+web/
+server/
+android/
+packages/
+shared/
+widget-sdk/
+widgets/
+clock/
+weather/
+calendar/
+sensors/
+notes/
+network/
+system/
+deployment/
+docker/
+scripts/
+docs/
+tests/
+.env.example
+.gitignore
+README.md
+
+Cette structure est indicative.
+
+Adapte-la si une meilleure organisation existe.
+
+---
+
+# 24. QUALITÉ DU CODE
+
+Le code doit être :
+
+* lisible ;
+* typé autant que possible ;
+* modulaire ;
+* documenté lorsque nécessaire ;
+* sans duplication excessive ;
+* testé sur les parties critiques.
+
+Configurer :
+
+* TypeScript strict ;
+* lint ;
+* formatage ;
+* tests ;
+* gestion propre des erreurs.
+
+Ne surcharge pas le code de commentaires évidents.
+
+---
+
+# 25. TESTS
+
+Prévoir au minimum des tests pour :
+
+* API principales ;
+* persistance des layouts ;
+* système de widgets ;
+* parsing/configuration ;
+* mises à jour ;
+* migrations ;
+* fonctions critiques.
+
+Pour les services externes, utiliser des mocks lorsque pertinent.
+
+---
+
+# 26. OBSERVABILITÉ
+
+Créer des logs utiles.
+
+Exemples :
+
+* démarrage serveur ;
+* connexion tablette ;
+* erreurs widget ;
+* récupération météo ;
+* Google OAuth ;
+* capteurs connectés/déconnectés ;
+* recherche de mise à jour ;
+* installation ;
+* rollback.
+
+Ne jamais écrire les tokens/secrets dans les logs.
+
+Prévoir une rotation raisonnable des logs afin de ne pas remplir le stockage du Raspberry Pi.
+
+---
+
+# 27. BACKUP
+
+Prévoir une solution simple permettant de sauvegarder :
+
+* base SQLite ;
+* configuration ;
+* layouts ;
+* notes ;
+* paramètres.
+
+Je dois pouvoir restaurer facilement HomeDash après une panne ou une réinstallation du Raspberry Pi.
+
+---
+
+# 28. INSTALLATION
+
+Je veux pouvoir installer HomeDash relativement facilement sur un Raspberry Pi neuf.
+
+Créer une documentation détaillée :
+
+docs/installation-raspberry-pi.md
+
+Elle doit expliquer :
+
+1. prérequis ;
+2. installation ;
+3. configuration ;
+4. variables d'environnement ;
+5. lancement ;
+6. démarrage automatique ;
+7. accès depuis le réseau local ;
+8. installation/configuration de l'application Android ;
+9. Google OAuth ;
+10. mises à jour ;
+11. sauvegarde/restauration ;
+12. dépannage.
+
+---
+
+# 29. DOCUMENTATION POUR CRÉER UN WIDGET
+
+Créer :
+
+docs/creating-a-widget.md
+
+Ce document doit expliquer précisément comment créer un widget.
+
+Exemple :
+
+"Créer un widget affichant le prix du Bitcoin."
+
+Expliquer :
+
+* structure ;
+* manifest ;
+* frontend ;
+* backend éventuel ;
+* paramètres ;
+* stockage ;
+* dimensions ;
+* rafraîchissement ;
+* erreurs ;
+* ajout au catalogue ;
+* tests.
+
+L'objectif est que dans quelques mois je puisse donner cette documentation à Codex avec :
+
+"Ajoute un widget X"
+
+et que le nouveau widget s'intègre proprement.
+
+---
+
+# 30. ÉTAPES DE DÉVELOPPEMENT
+
+NE COMMENCE PAS en essayant de développer toutes les fonctionnalités simultanément.
+
+Travaille progressivement.
+
+## Phase 0 - Analyse
+
+Avant de coder :
+
+1. analyser le cahier des charges ;
+2. inspecter le repository ;
+3. vérifier les contraintes Android 10 ;
+4. proposer la stack ;
+5. proposer l'architecture ;
+6. identifier les risques techniques ;
+7. expliquer les principaux choix ;
+8. créer un plan d'implémentation.
+
+Ensuite seulement commencer.
+
+## Phase 1 - Fondation
+
+Créer :
+
+* monorepo ;
+* frontend ;
+* backend ;
+* SQLite ;
+* API ;
+* système de configuration ;
+* système de pages ;
+* système de widgets ;
+* grille ;
+* persistance des layouts.
+
+Créer quelques widgets simples :
+
+* Clock ;
+* Notes ;
+* System.
+
+Objectif :
+
+obtenir rapidement un dashboard réellement utilisable.
+
+## Phase 2 - Éditeur
+
+Ajouter :
+
+* mode édition ;
+* drag-and-drop tactile ;
+* resize ;
+* ajout/suppression ;
+* catalogue des widgets ;
+* configuration ;
+* pages.
+
+Tester particulièrement les interactions tactiles.
+
+## Phase 3 - Services externes
+
+Ajouter :
+
+* météo actuelle ;
+* prévisions ;
+* Google Calendar.
+
+## Phase 4 - Capteurs
+
+Créer :
+
+* abstraction Sensor ;
+* API capteurs ;
+* mock sensors ;
+* éventuellement MQTT ;
+* widgets température.
+
+## Phase 5 - Android
+
+Créer l'application Android kiosque :
+
+* WebView ;
+* plein écran ;
+* démarrage ;
+* communication serveur ;
+* état système ;
+* caméra ;
+* détection présence ;
+* gestion écran.
+
+Tester les limitations spécifiques Android 10.
+
+## Phase 6 - Mise à jour
+
+Créer le mécanisme :
+
+* recherche version ;
+* affichage nouvelle version ;
+* installation ;
+* health check ;
+* rollback.
+
+## Phase 7 - Stabilisation
+
+Ajouter :
+
+* tests ;
+* gestion offline ;
+* cache ;
+* logs ;
+* backup ;
+* documentation ;
+* optimisation.
+
+---
+
+# 31. CRITÈRES DU MVP
+
+Je considère le premier MVP réussi si :
+
+1. HomeDash fonctionne sur le Raspberry Pi ;
+2. la tablette affiche le dashboard ;
+3. l'interface est utilisable tactilement ;
+4. plusieurs widgets sont affichables ;
+5. les widgets peuvent être déplacés ;
+6. les widgets peuvent être redimensionnés ;
+7. leur disposition est sauvegardée ;
+8. plusieurs pages sont possibles ;
+9. Notes fonctionne hors ligne ;
+10. météo fonctionne ;
+11. Google Calendar fonctionne en lecture et écriture ;
+12. les capteurs simulés fonctionnent ;
+13. les métriques Raspberry Pi fonctionnent ;
+14. la tablette fonctionne en kiosque ;
+15. la détection de présence fonctionne dans les limites d'Android ;
+16. l'écran peut être géré correctement ;
+17. une nouvelle version peut être détectée ;
+18. la mise à jour reste volontaire/manuelle ;
+19. une mise à jour défectueuse peut être annulée ;
+20. un nouveau widget peut être ajouté sans modifier profondément l'application.
+
+---
+
+# 32. PRINCIPES IMPORTANTS
+
+Pendant tout le développement :
+
+* ne jamais mettre de secrets dans Git ;
+* ne pas dépendre inutilement du cloud ;
+* privilégier le fonctionnement local ;
+* ne pas surarchitecturer ;
+* ne pas sacrifier la modularité ;
+* vérifier les limitations réelles d'Android avant d'implémenter ;
+* ne pas inventer des API ou capacités matérielles ;
+* conserver la compatibilité Android 10 ;
+* privilégier une interface tactile ;
+* garder le Raspberry Pi comme serveur central ;
+* considérer la tablette comme un client remplaçable ;
+* documenter les décisions architecturales importantes.
+
+Si une demande est techniquement impossible ou très peu fiable, ne crée pas un faux fonctionnement : explique le problème et propose la meilleure alternative.
+
+---
+
+# 33. TA PREMIÈRE TÂCHE
+
+Commence maintenant uniquement par la **Phase 0**.
+
+Ne développe pas encore l'intégralité de HomeDash.
+
+Je veux d'abord que tu :
+
+1. inspectes l'environnement et le repository actuel ;
+2. reformules brièvement ta compréhension du projet ;
+3. proposes l'architecture définitive ;
+4. choisisses la stack technique ;
+5. présentes les composants principaux ;
+6. expliques comment les widgets seront isolés ;
+7. définisses comment la tablette communiquera avec le Raspberry Pi ;
+8. proposes le mécanisme de mise à jour et de rollback ;
+9. analyses précisément la faisabilité de la détection de présence et de la gestion de l'écran sous Android 10 ;
+10. identifies les principaux risques ;
+11. proposes l'arborescence du repository ;
+12. proposes un plan d'implémentation détaillé et ordonné.
+
+Pour chaque choix important, explique brièvement pourquoi.
+
+Ne me pose des questions que si une information manquante empêche réellement une décision. Pour les décisions techniques ordinaires, prends l'initiative et choisis la solution la plus adaptée au projet.
+
+Une fois cette analyse terminée, attends ma validation avant de commencer la Phase 1.
