@@ -30,7 +30,7 @@ jobs:
           tags: |
             ghcr.io/orpheusbauer/homedash:${{ github.ref_name }}
             ghcr.io/orpheusbauer/homedash:latest
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
