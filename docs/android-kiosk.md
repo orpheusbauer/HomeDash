@@ -27,7 +27,16 @@ La ligne doit finir par `device`, pas `unauthorized`. Android 10 ne dispose pas 
 
 ## 3. Obtenir l’APK
 
-Option la plus simple : ouvrez l’exécution GitHub Actions `CI`, téléchargez l’artifact `homedash-kiosk-debug`, puis décompressez-le. L’APK debug convient à une installation domestique initiale mais pas à une distribution publique.
+Option la plus simple :
+
+1. ouvrez le dépôt sur GitHub, puis **Actions** ;
+2. dans la colonne de gauche, choisissez **CI** ;
+3. ouvrez l’exécution correspondant au dernier commit de `main` — il faut ouvrir le run lui-même, pas seulement rester sur la liste ;
+4. sur l’onglet **Summary**, descendez tout en bas jusqu’à la section **Artifacts** ;
+5. cliquez sur **homedash-kiosk-debug** pour télécharger une archive ZIP ;
+6. décompressez le ZIP : il contient `app-debug.apk`.
+
+L’artifact peut exister même si le run global est rouge, à condition que le job **android** soit vert et que l’étape **Upload artifact** ait réussi. S’il n’y a aucune section **Artifacts**, ouvrez le job **android** et vérifiez cette étape. L’APK debug convient à une installation domestique initiale mais pas à une distribution publique.
 
 Construction locale si Android Studio/SDK et JDK 17 sont installés :
 
