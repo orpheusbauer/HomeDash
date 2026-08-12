@@ -1,0 +1,29 @@
+[Unit]
+Description=HomeDash privileged update agent
+After=docker.service network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+User=homedash-updater
+Group=homedash
+Environment=NODE_ENV=production
+Environment=HOMEDASH_ROOT=/opt/homedash
+Environment=HOMEDASH_DATA_DIR=/var/lib/homedash/data
+Environment=HOMEDASH_UPDATER_SOCKET=/run/homedash-updater/updater.sock
+Environment=HOMEDASH_UPDATER_TOKEN_FILE=/etc/homedash/updater-token
+Environment=HOMEDASH_ALLOWED_IMAGE=ghcr.io/orpheusbauer/homedash
+ExecStart=/usr/bin/node /opt/homedash/deployment/updater/agent.mjs
+Restart=on-failure
+RestartSec=5
+RuntimeDirectory=homedash-updater
+RuntimeDirectoryMode=0770
+UMask=0007
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/homedash /run/homedash-updater
+
+[Install]
+WantedBy=multi-user.target

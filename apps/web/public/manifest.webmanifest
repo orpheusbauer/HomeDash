@@ -1,0 +1,10 @@
+{
+  "name": "HomeDash",
+  "short_name": "HomeDash",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8f5",
+  "theme_color": "#f7f8f5",
+  "lang": "fr",
+  "description": "Dashboard domestique local-first"
+}

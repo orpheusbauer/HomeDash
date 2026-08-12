@@ -1,0 +1,72 @@
+# HomeDash
+
+HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et à une tablette Android murale. Le Raspberry Pi héberge l’interface, l’API Fastify, SQLite, les intégrations et les mises à jour. L’application Kotlin transforme la tablette en client kiosque et réalise la détection de présence localement, sans enregistrer ni transmettre d’image.
+
+## État du projet
+
+La version `0.1.0` fournit déjà :
+
+- une grille tactile responsive avec déplacement, redimensionnement, ajout, configuration et suppression de widgets ;
+- des pages persistantes avec historique et annulation de la dernière disposition ;
+- les widgets horloge, notes autosauvegardées, météo actuelle, prévisions, capteurs, réseau, système et Google Calendar ;
+- météo Open-Meteo mise en cache, Calendar OAuth 2.0 en lecture/écriture, capteurs HTTP et capteurs simulés ;
+- WebSocket pour les changements de dashboard, métriques et capteurs ;
+- SQLite local, migrations, sauvegardes cohérentes et cache hors ligne ;
+- authentification locale des opérations administratives et association à usage unique des tablettes ;
+- application Android 10+ WebView/kiosque, télémétrie, démarrage au boot et détection locale de visage comme signal de présence — aucune reconnaissance ;
+- images Docker multiarchitecture, Caddy HTTPS local, systemd, mises à jour GitHub Releases avec sauvegarde, health check et rollback ;
+- CI GitHub, tests TypeScript et construction Android.
+
+Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
+
+## Démarrage local
+
+Prérequis : Node.js 24 LTS et npm 11+.
+
+```powershell
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+Ouvrez `http://localhost:5173`. En développement, le jeton administrateur par défaut est `development-admin-token`. Ne l’utilisez jamais en production.
+
+Contrôles complets :
+
+```powershell
+npm run format:check
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
+
+## Documentation
+
+- [Installation complète du Raspberry Pi](docs/installation-raspberry-pi.md)
+- [Préparation et installation de la tablette](docs/android-kiosk.md)
+- [Google Calendar OAuth](docs/google-calendar.md)
+- [Capteurs HTTP et ESP32](docs/sensors.md)
+- [Mises à jour et releases](docs/updates.md)
+- [Sauvegarde et restauration](docs/backup-and-restore.md)
+- [Créer un widget](docs/creating-a-widget.md)
+- [Architecture et sécurité](docs/architecture.md)
+- [Développement et commandes](docs/development.md)
+- [Travail restant et ordre conseillé](docs/remaining-work.md)
+
+## Structure
+
+```text
+apps/web/             React/Vite et catalogue des widgets
+apps/server/          Fastify, SQLite, services et API
+apps/android/         conteneur kiosque Kotlin pour Android 10+
+packages/contracts/   schémas Zod et types partagés
+deployment/           Docker, Caddy, systemd et agent de rollback
+examples/             exemple ESP32/DHT22
+scripts/              OAuth, secrets et diagnostic
+docs/                 guides opératoires
+```
+
+## Licence et secrets
+
+Aucune licence n’est encore choisie. Ajoutez un fichier `LICENSE` avant de rendre le dépôt public si vous souhaitez définir explicitement les droits de réutilisation. Les `.env`, clés, certificats privés, identifiants OAuth et tokens sont ignorés par Git ; vérifiez malgré tout `git diff --cached` avant chaque push.

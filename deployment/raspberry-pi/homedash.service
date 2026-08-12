@@ -1,0 +1,17 @@
+[Unit]
+Description=HomeDash Docker Compose stack
+After=docker.service network-online.target homedash-updater.service
+Requires=docker.service
+Wants=network-online.target homedash-updater.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/homedash/deployment/docker
+ExecStart=/usr/bin/docker compose --env-file /var/lib/homedash/data/release.env -f /opt/homedash/deployment/docker/compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --env-file /var/lib/homedash/data/release.env -f /opt/homedash/deployment/docker/compose.yml down
+TimeoutStartSec=180
+TimeoutStopSec=90
+
+[Install]
+WantedBy=multi-user.target

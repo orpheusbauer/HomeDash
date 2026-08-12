@@ -1,0 +1,66 @@
+services:
+  homedash:
+    image: ${HOMEDASH_IMAGE:-ghcr.io/orpheusbauer/homedash:v0.1.0}
+    container_name: homedash
+    restart: unless-stopped
+    init: true
+    env_file:
+      - /etc/homedash/homedash.env
+    environment:
+      NODE_ENV: production
+      HOMEDASH_HOST: 0.0.0.0
+      HOMEDASH_PORT: 4100
+      HOMEDASH_DATABASE_PATH: /data/homedash.db
+      HOMEDASH_PUBLIC_URL: https://${HOMEDASH_HOSTNAME:-homedash.home.arpa}
+      HOMEDASH_UPDATER_SOCKET: /run/homedash-updater/updater.sock
+      HOMEDASH_UPDATER_TOKEN_FILE: /run/secrets/homedash-updater-token
+    volumes:
+      - /var/lib/homedash/data:/data
+      - /run/homedash-updater:/run/homedash-updater
+      - /etc/homedash/updater-token:/run/secrets/homedash-updater-token:ro
+    group_add:
+      - '${HOMEDASH_HOST_GID:-4100}'
+    ports:
+      - '127.0.0.1:4100:4100'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,noexec,nosuid,nodev
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:4100/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 4s
+      retries: 4
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: homedash-caddy
+    restart: unless-stopped
+    depends_on:
+      homedash:
+        condition: service_healthy
+    environment:
+      HOMEDASH_HOSTNAME: ${HOMEDASH_HOSTNAME:-homedash.home.arpa}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /var/lib/homedash/caddy-data:/data
+      - /var/lib/homedash/caddy-config:/config
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  default:
+    name: homedash

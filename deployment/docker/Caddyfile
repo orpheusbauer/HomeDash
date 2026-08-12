@@ -1,0 +1,14 @@
+{$HOMEDASH_HOSTNAME:homedash.home.arpa} {
+  tls internal
+  encode zstd gzip
+
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "same-origin"
+    Permissions-Policy "geolocation=(), microphone=(), payment=()"
+    -Server
+  }
+
+  reverse_proxy homedash:4100
+}

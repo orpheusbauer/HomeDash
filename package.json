@@ -1,0 +1,48 @@
+{
+  "name": "homedash",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Dashboard domestique local-first pour Raspberry Pi et tablette Android",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12 <27"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -n contracts,server,web -c blue,green,magenta \"npm:dev:contracts\" \"npm:dev:server\" \"npm:dev:web\"",
+    "dev:contracts": "npm run dev -w @homedash/contracts",
+    "dev:server": "npm run dev -w @homedash/server",
+    "dev:web": "npm run dev -w @homedash/web",
+    "build": "npm run build -w @homedash/contracts && npm run build -w @homedash/server && npm run build -w @homedash/web",
+    "typecheck": "npm run build -w @homedash/contracts && npm run typecheck -w @homedash/server && npm run typecheck -w @homedash/web && npm run typecheck -w @homedash/contracts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:migrate": "npm run db:migrate -w @homedash/server",
+    "db:seed": "npm run db:seed -w @homedash/server",
+    "start": "npm run start -w @homedash/server"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@types/node": "latest",
+    "concurrently": "latest",
+    "eslint": "latest",
+    "eslint-config-prettier": "latest",
+    "globals": "latest",
+    "prettier": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vitest": "latest"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "esbuild@0.27.7": true,
+    "esbuild@0.28.2": true,
+    "core-js@3.50.0": true
+  }
+}
