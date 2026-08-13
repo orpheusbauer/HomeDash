@@ -13,12 +13,18 @@ const envSchema = z.object({
   HOMEDASH_SENSOR_INGEST_TOKEN: z.string().min(12).default('development-sensor-token'),
   HOMEDASH_ENCRYPTION_KEY: z.string().optional(),
   HOMEDASH_GITHUB_REPOSITORY: z.string().default('orpheusbauer/HomeDash'),
+  HOMEDASH_GITHUB_TOKEN_FILE: z.string().optional(),
   HOMEDASH_UPDATER_SOCKET: z.string().default('/run/homedash-updater/updater.sock'),
   HOMEDASH_UPDATER_TOKEN: z.string().optional(),
   HOMEDASH_UPDATER_TOKEN_FILE: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
+  HOMEDASH_SYSTEM_METRICS_INTERVAL_MS: z.coerce.number().int().min(5_000).default(10_000),
+  HOMEDASH_ENABLE_MOCK_SENSORS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
 });
 
 function readVersion(): string {
@@ -30,7 +36,7 @@ function readVersion(): string {
       // The image can inject HOMEDASH_VERSION when VERSION is not beside the process.
     }
   }
-  return process.env.HOMEDASH_VERSION ?? '0.1.0';
+  return process.env.HOMEDASH_VERSION ?? '0.1.1';
 }
 
 export const config = {

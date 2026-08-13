@@ -6,23 +6,27 @@ import { readSystemMetrics } from './services/system.js';
 
 const app = await createApp();
 
-const mockTimer = setInterval(() => {
-  void import('./repositories/dashboard.js').then(({ tickMockSensors }) => {
-    tickMockSensors().forEach((sensor) => broadcast({ type: 'sensor.updated', payload: sensor }));
-  });
-}, 30_000);
-mockTimer.unref();
+const mockTimer = config.HOMEDASH_ENABLE_MOCK_SENSORS
+  ? setInterval(() => {
+      void import('./repositories/dashboard.js').then(({ tickMockSensors }) => {
+        tickMockSensors().forEach((sensor) =>
+          broadcast({ type: 'sensor.updated', payload: sensor }),
+        );
+      });
+    }, 30_000)
+  : undefined;
+mockTimer?.unref();
 
 const systemTimer = setInterval(() => {
   void readSystemMetrics().then((metrics) =>
     broadcast({ type: 'system.updated', payload: metrics }),
   );
-}, 10_000);
+}, config.HOMEDASH_SYSTEM_METRICS_INTERVAL_MS);
 systemTimer.unref();
 
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'HomeDash stopping');
-  clearInterval(mockTimer);
+  if (mockTimer) clearInterval(mockTimer);
   clearInterval(systemTimer);
   await app.close();
   closeDatabase();

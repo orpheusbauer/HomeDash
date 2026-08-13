@@ -15,6 +15,7 @@ const releaseSchema = z.object({
   assets: z.array(
     z.object({
       name: z.string(),
+      url: z.string().url(),
       browser_download_url: z.string().url(),
       digest: z.string().nullable().optional(),
     }),
@@ -29,6 +30,25 @@ const releaseManifestSchema = z.object({
 });
 
 export type ReleaseManifest = z.infer<typeof releaseManifestSchema>;
+
+function githubToken(): string | undefined {
+  if (!config.HOMEDASH_GITHUB_TOKEN_FILE) return undefined;
+  try {
+    const token = readFileSync(config.HOMEDASH_GITHUB_TOKEN_FILE, 'utf8').trim();
+    return token || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function githubHeaders(accept = 'application/vnd.github+json'): Record<string, string> {
+  const token = githubToken();
+  return {
+    Accept: accept,
+    'User-Agent': `HomeDash/${config.version}`,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+}
 
 function semverParts(value: string): [number, number, number] {
   const match = value.replace(/^v/, '').match(/^(\d+)\.(\d+)\.(\d+)/);
@@ -59,10 +79,7 @@ export async function checkForUpdates(): Promise<{
   const response = await fetch(
     `https://api.github.com/repos/${config.HOMEDASH_GITHUB_REPOSITORY}/releases/latest`,
     {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': `HomeDash/${config.version}`,
-      },
+      headers: githubHeaders(),
       signal: AbortSignal.timeout(8000),
     },
   );
@@ -87,7 +104,8 @@ export async function checkForUpdates(): Promise<{
   let manifest: ReleaseManifest | null = null;
   if (manifestAsset) {
     try {
-      const manifestResponse = await fetch(manifestAsset.browser_download_url, {
+      const manifestResponse = await fetch(manifestAsset.url, {
+        headers: githubHeaders('application/octet-stream'),
         signal: AbortSignal.timeout(8000),
       });
       if (manifestResponse.ok)

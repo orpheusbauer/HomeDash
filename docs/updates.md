@@ -1,130 +1,187 @@
-# GitHub, releases et mises à jour sûres
+# Releases et mises à jour natives du Raspberry Pi Zero
 
-Un push sur `main` ne met jamais le Raspberry Pi à jour. Seul un tag SemVer crée une GitHub Release et une image Docker multiarchitecture. L’installation reste un clic administrateur.
+HomeDash n’utilise pas Docker sur le Raspberry Pi Zero original. Une GitHub Release contient une archive JavaScript déjà compilée. Le Pi installe chaque version dans un dossier séparé et `/opt/homedash/current` désigne la version active.
 
-## 1. Préparer le dépôt GitHub
+## 1. Contenu d’une release
 
-Sur GitHub :
+Un tag `vX.Y.Z` lance `.github/workflows/release.yml`. GitHub Actions :
 
-1. vérifiez que le dépôt `orpheusbauer/HomeDash` existe ;
-2. Settings > Actions > General : autorisez les actions GitHub utilisées par le dépôt ;
-3. Workflow permissions : accordez lecture/écriture pour permettre à `release.yml` de créer une release et pousser dans GHCR ;
-4. gardez la protection de `main` optionnelle au début, puis exigez la CI quand elle est verte ;
-5. vérifiez qu’aucun secret n’est commité ; les secrets de production restent sur le Pi.
+1. installe les dépendances sur un runner puissant ;
+2. construit les contrats TypeScript, le serveur et l’interface Vite ;
+3. crée `homedash-native-X.Y.Z.tar.gz` ;
+4. crée son fichier `homedash-native-X.Y.Z.tar.gz.sha256` ;
+5. compile l’APK Android debug ;
+6. publie ces trois assets dans GitHub Releases.
 
-## 2. Premier push depuis le PC
+Le Pi ne compile aucun TypeScript et ne télécharge aucune image GHCR.
 
-Examinez toujours les fichiers avant de les indexer :
+## 2. Publier une nouvelle version depuis le PC
+
+Mettez `VERSION`, `package.json` et les trois packages applicatifs à la même version. Exécutez :
 
 ```powershell
+npm.cmd run format:check
+npm.cmd run lint
+npm.cmd run typecheck
+npm.cmd test
+npm.cmd run build
 git status --short
-git diff --check
-git diff
-git add .
-git status --short
-git diff --cached --stat
-git diff --cached
-git commit -m "feat: build HomeDash 0.1.0 MVP"
-git push origin main
 ```
 
-Sur GitHub > Actions, attendez que `CI` réussisse : format, lint, types, tests, build web/server et APK Android. Corrigez la CI avant de créer un tag.
-
-Si `origin` n’existait pas :
+Committez puis poussez `main`. Attendez une CI entièrement verte. Créez seulement ensuite le tag :
 
 ```powershell
-git remote add origin https://github.com/orpheusbauer/HomeDash.git
-git push -u origin main
-```
-
-Dans ce workspace, `origin` est déjà configuré ; ne répétez pas `remote add`.
-
-## 3. Créer la première release
-
-La valeur dans `VERSION` doit être `0.1.0`, et le tag `v0.1.0` :
-
-```powershell
-Get-Content VERSION
-git tag -a v0.1.0 -m "HomeDash 0.1.0"
-git push origin v0.1.0
-```
-
-Le workflow `Release` :
-
-1. construit `deployment/docker/Dockerfile` pour `linux/amd64` et `linux/arm64` ;
-2. pousse `ghcr.io/orpheusbauer/homedash:v0.1.0` et `latest` ;
-3. récupère le digest immuable SHA-256 ;
-4. construit l’APK debug ;
-5. publie `homedash-release.json`, l’APK et les notes générées dans GitHub Releases.
-
-Ne déplacez pas un tag publié vers un autre commit. En cas de correction, créez `0.1.1`.
-
-## 4. Fonctionnement du bouton Installer
-
-Le serveur lit uniquement la dernière GitHub Release du dépôt configuré. Le bouton n’est actif que si :
-
-- la version est supérieure à `VERSION` ;
-- la release contient `homedash-release.json` valide ;
-- l’image est exactement dans l’allowlist `ghcr.io/orpheusbauer/homedash` ;
-- le digest a 64 caractères hexadécimaux ;
-- le socket de l’agent est présent ;
-- l’utilisateur a fourni le token administrateur.
-
-L’agent séparé effectue : sauvegarde SQLite, `docker pull image@digest`, écriture atomique de `release.env`, `docker compose up`, attente de `/health/ready`. Après 90 secondes sans santé, il arrête la candidate, restaure la base pré-mise-à-jour et l’image précédente, puis vérifie le rollback.
-
-Le serveur web n’a ni le socket Docker ni la capacité d’exécuter une commande. L’agent construit des tableaux d’arguments Docker sans shell et n’accepte aucun nom d’image arbitraire.
-
-## 5. Publier une version suivante
-
-Pour une fonctionnalité compatible :
-
-```powershell
-# modifier VERSION et les versions package/app si nécessaire
-npm run format
-npm run lint
-npm run typecheck
-npm test
-npm run build
-git add .
-git commit -m "feat: describe the feature"
-git push origin main
-# attendre la CI
 git tag -a v0.2.0 -m "HomeDash 0.2.0"
 git push origin v0.2.0
 ```
 
-Règles SemVer : PATCH pour bug compatible, MINOR pour fonctionnalité compatible, MAJOR pour rupture. Tant que le produit est `0.x`, documentez malgré tout les migrations et changements de configuration.
+Ne réutilisez et ne déplacez jamais un tag publié. Une correction de `v0.2.0` devient `v0.2.1`.
 
-## 6. Mise à jour des fichiers d’exploitation du Pi
+## 3. Vérifier la release dans GitHub
 
-L’image met à jour l’application, mais un changement de `compose.yml`, Caddy, systemd ou de l’agent exige aussi une mise à jour contrôlée de `/opt/homedash`. À chaque release qui modifie `deployment/` :
+Dans **Actions > Release**, attendez le vert. Dans **Releases > v0.2.0**, vérifiez :
 
-```bash
-cd /opt/homedash
-sudo git fetch --tags origin
-sudo git checkout v0.2.0
-sudo bash deployment/raspberry-pi/install-services.sh
-sudo systemctl restart homedash-updater homedash
+```text
+homedash-native-0.2.0.tar.gz
+homedash-native-0.2.0.tar.gz.sha256
+homedash-kiosk-0.2.0-debug.apk
 ```
 
-Faites cette étape en SSH avec accès physique possible. Une évolution future pourra versionner l’agent séparément, mais il ne doit jamais s’auto-remplacer depuis une requête web.
+L’absence du SHA-256 interdit l’installation automatique. Ne fabriquez pas ce fichier manuellement après coup : corrigez le workflow et créez une nouvelle version.
 
-## 7. Diagnostic et reprise manuelle
+## 4. Mettre à jour le clone de maintenance sur le Pi
 
 ```bash
-sudo cat /var/lib/homedash/data/update-status.json
-sudo journalctl -u homedash-updater --since '30 minutes ago'
-sudo cat /var/lib/homedash/data/release.env
-sudo docker images ghcr.io/orpheusbauer/homedash --digests
-curl -fsS http://127.0.0.1:4100/health/ready
+cd /opt/homedash/repository
+git status --short
+git fetch --tags origin
+git checkout v0.2.0
 ```
 
-Si l’état est `rollback-failed`, n’effacez rien. Sauvegardez `/var/lib/homedash/data`, choisissez un ancien digest connu dans `release.env`, puis relancez Compose. Consultez [backup-and-restore.md](backup-and-restore.md).
+Le statut doit être propre. Le clone ne sert pas à compiler ; il apporte les nouveaux scripts de déploiement et la documentation correspondant au tag.
 
-## 8. Durcissements avant 1.0
+Avant d’installer, recopiez la dernière version du script d’update :
 
-- signer le descripteur de release avec Sigstore/cosign et vérifier la signature sur le Pi ;
-- signer l’APK release avec un keystore hors dépôt et secrets GitHub Actions ;
-- tester automatiquement une migration destructive puis rollback sur une copie réelle ;
-- ajouter une rétention automatique des anciennes images/backups ;
-- afficher la progression détaillée de l’agent par WebSocket.
+```bash
+sudo install -o root -g root -m 0755 \
+  deployment/raspberry-pi-zero/update-native.sh \
+  /usr/local/sbin/homedash-update-native
+```
+
+Si la release modifie l’unité `systemd` ou Nginx, relancez plutôt l’installeur idempotent :
+
+```bash
+sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
+  bash deployment/raspberry-pi-zero/install-native.sh v0.2.0
+```
+
+Le fichier `/etc/homedash/homedash.env` et l’autorité de certification existants ne sont pas remplacés.
+
+## 5. Installation normale d’une release
+
+```bash
+sudo homedash-update-native v0.2.0
+```
+
+Le script :
+
+1. lit le dépôt configuré dans `/etc/homedash/homedash.env` ;
+2. utilise `/etc/homedash/github-token` si le dépôt est privé ;
+3. télécharge l’archive et le SHA-256 via l’API GitHub ;
+4. vérifie le hash et refuse les chemins d’archive dangereux ;
+5. installe dans `/opt/homedash/releases/0.2.0` ;
+6. lance `npm ci --omit=dev --ignore-scripts` avec un seul job et une limite mémoire ;
+7. arrête brièvement HomeDash ;
+8. sauvegarde les données dans `/var/lib/homedash/data/backups` ;
+9. bascule atomiquement le lien `/opt/homedash/current` ;
+10. attend jusqu’à 120 secondes que `/health/ready` réponde ;
+11. restaure automatiquement la base et l’ancien lien en cas d’échec.
+
+N’interrompez pas le Pi entre l’arrêt du service et la fin du health check.
+
+## 6. Vérifications après mise à jour
+
+```bash
+cat /var/lib/homedash/installed-version
+readlink -f /opt/homedash/current
+sudo systemctl status homedash --no-pager
+curl --fail http://127.0.0.1:4100/health/ready
+sudo journalctl -u homedash --since '15 minutes ago' --no-pager
+```
+
+Depuis la tablette :
+
+- rechargez l’interface ;
+- vérifiez les widgets essentiels ;
+- testez une écriture de note ;
+- vérifiez la télémétrie de la tablette ;
+- confirmez que la version affichée correspond à la release.
+
+## 7. Rollback manuel
+
+Le rollback automatique couvre l’échec de démarrage immédiat. Pour revenir manuellement après un problème fonctionnel découvert plus tard :
+
+```bash
+ls -la /opt/homedash/releases
+ls -lt /var/lib/homedash/data/backups
+sudo systemctl stop homedash
+sudo ln -sfn /opt/homedash/releases/0.1.1 /opt/homedash/current
+sudo systemctl start homedash
+curl --fail http://127.0.0.1:4100/health/ready
+```
+
+Attention : revenir seulement au code ne rétrograde pas automatiquement le schéma SQLite. Si la nouvelle version a lancé une migration incompatible, restaurez aussi la sauvegarde `pre-X.Y.Z-*.tar.gz` créée juste avant cette mise à jour. Suivez [backup-and-restore.md](backup-and-restore.md).
+
+## 8. Rotation du token GitHub
+
+Avant l’expiration du fine-grained token :
+
+1. créez un nouveau token limité au dépôt, `Contents: Read-only` ;
+2. saisissez-le sur le Pi sans historique :
+
+```bash
+read -rsp "Nouveau token GitHub: " GITHUB_RELEASE_TOKEN; echo
+printf '%s' "$GITHUB_RELEASE_TOKEN" | sudo tee /etc/homedash/github-token >/dev/null
+unset GITHUB_RELEASE_TOKEN
+sudo chown root:homedash /etc/homedash/github-token
+sudo chmod 0640 /etc/homedash/github-token
+```
+
+3. testez la prochaine release ;
+4. révoquez l’ancien token dans GitHub.
+
+## 9. Mise à jour de Node.js ARMv6
+
+Ne remplacez pas Node à chaque release HomeDash. La version ARMv6 est verrouillée avec un hash dans `install-node-armv6.sh`.
+
+Avant de changer cette version :
+
+- vérifiez qu’un asset `linux-armv6l` existe réellement ;
+- vérifiez sa provenance et son SHA-256 ;
+- vérifiez que `node:sqlite` fonctionne ;
+- testez HomeDash sur le vrai Pi ;
+- gardez l’ancien dossier `/opt/node-v…` jusqu’à validation.
+
+Node 24 n’est actuellement pas produit par la recette ARMv6 utilisée. Ne faites pas pointer `/usr/local/bin/node` vers un binaire ARMv7/ARM64.
+
+## 10. Nettoyage manuel des anciennes releases
+
+Le script ne supprime rien automatiquement. Après plusieurs mises à jour validées, gardez au moins la version active et une version précédente :
+
+```bash
+readlink -f /opt/homedash/current
+ls -la /opt/homedash/releases
+```
+
+Avant toute suppression, vérifiez que le dossier n’est pas la cible de `current` et qu’une sauvegarde exploitable existe. Sur une petite carte SD, surveillez aussi :
+
+```bash
+df -h /
+du -sh /opt/homedash/releases/* /var/lib/homedash/data/backups/*
+```
+
+## 11. Limite actuelle de l’interface de mise à jour
+
+Sur le Zero, la vérification de la dernière release peut utiliser le token GitHub en lecture seule. En revanche, l’installation depuis un bouton de l’interface reste volontairement désactivée : la mise à jour nécessite une commande `sudo` par SSH.
+
+Ce choix évite de donner au serveur web le droit de remplacer son propre code ou de contrôler `systemd`. Une future version pourra ajouter un petit agent natif privilégié avec protocole strict, mais ce n’est pas requis pour l’installation initiale.

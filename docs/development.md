@@ -6,7 +6,7 @@
 - npm 11+ ;
 - Git ;
 - pour Android : JDK 17, Android SDK API 35 et Gradle 8.10.2 ;
-- Docker Desktop facultatif pour tester l’image.
+- Bash et GNU tar pour tester la création de l’archive native de release.
 
 ## Installation
 
@@ -29,7 +29,10 @@ Le web écoute sur 5173, l’API sur 4100. Vite proxyfie `/api`. La base de dév
 - `HOMEDASH_PUBLIC_URL` : origine web autorisée en développement.
 - `GOOGLE_OAUTH_*` : intégration Calendar côté serveur.
 - `HOMEDASH_GITHUB_REPOSITORY` : releases à consulter.
-- `HOMEDASH_UPDATER_SOCKET` et `*_TOKEN_FILE` : agent du Pi.
+- `HOMEDASH_GITHUB_TOKEN_FILE` : token GitHub lecture seule lorsque le dépôt est privé.
+- `HOMEDASH_SYSTEM_METRICS_INTERVAL_MS` : période des métriques, 30 s sur le Zero.
+- `HOMEDASH_ENABLE_MOCK_SENSORS` : animation périodique des mocks, désactivée en production.
+- `HOMEDASH_UPDATER_SOCKET` et `*_TOKEN_FILE` : ancien agent Docker, absent de la cible Zero.
 
 N’utilisez pas les valeurs de développement en production. `.env` est ignoré ; `.env.example` ne doit contenir que des exemples.
 
@@ -74,6 +77,23 @@ adb logcat
 ```
 
 Le build Android est aussi exécuté par GitHub Actions, car le poste actuel peut ne pas disposer du SDK.
+
+## Archive native Raspberry Pi Zero
+
+Après `npm run build`, Linux ou Git Bash peut reproduire l’asset de release :
+
+```bash
+bash deployment/raspberry-pi-zero/package-native.sh 0.1.1 output
+sha256sum --check output/homedash-native-0.1.1.tar.gz.sha256
+```
+
+L’archive contient les trois dossiers `dist` et les manifests nécessaires à `npm ci --omit=dev`. Elle ne contient ni `node_modules`, ni secrets, ni données. Ne lancez pas la chaîne de build sur le Zero ARMv6.
+
+Les scripts de déploiement doivent au minimum passer :
+
+```bash
+bash -n deployment/raspberry-pi-zero/*.sh
+```
 
 ## Conventions
 

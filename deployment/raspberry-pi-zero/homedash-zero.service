@@ -1,0 +1,36 @@
+[Unit]
+Description=HomeDash native service for Raspberry Pi Zero
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/opt/homedash/current/apps/server/dist/index.js
+
+[Service]
+Type=simple
+User=homedash
+Group=homedash
+WorkingDirectory=/opt/homedash/current
+EnvironmentFile=/etc/homedash/homedash.env
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--max-old-space-size=192
+ExecStart=/usr/local/bin/node apps/server/dist/index.js
+Restart=on-failure
+RestartSec=8
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/var/lib/homedash/data
+UMask=0007
+MemoryHigh=320M
+MemoryMax=400M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

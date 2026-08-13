@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.1.0` fournit déjà :
+La version `0.1.1` fournit déjà :
 
 - une grille tactile responsive avec déplacement, redimensionnement, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -14,14 +14,14 @@ La version `0.1.0` fournit déjà :
 - SQLite local, migrations, sauvegardes cohérentes et cache hors ligne ;
 - authentification locale des opérations administratives et association à usage unique des tablettes ;
 - application Android 10+ WebView/kiosque, télémétrie, démarrage au boot et détection locale de visage comme signal de présence — aucune reconnaissance ;
-- images Docker multiarchitecture, Caddy HTTPS local, systemd, mises à jour GitHub Releases avec sauvegarde, health check et rollback ;
+- déploiement natif ARMv6 sans Docker, Nginx HTTPS local, `systemd`, releases précompilées, sauvegarde, health check et rollback ;
 - CI GitHub, tests TypeScript et construction Android.
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 
 ## Démarrage local
 
-Prérequis : Node.js 24 LTS et npm 11+.
+Prérequis de développement : Node.js 24 LTS et npm 11+. Le Raspberry Pi Zero utilise séparément un runtime Node 22 ARMv6 verrouillé ; il ne compile jamais le projet.
 
 ```powershell
 Copy-Item .env.example .env
@@ -61,7 +61,7 @@ apps/web/             React/Vite et catalogue des widgets
 apps/server/          Fastify, SQLite, services et API
 apps/android/         conteneur kiosque Kotlin pour Android 10+
 packages/contracts/   schémas Zod et types partagés
-deployment/           Docker, Caddy, systemd et agent de rollback
+deployment/           installation native Pi Zero, Nginx, systemd et ancien chemin Docker
 examples/             exemple ESP32/DHT22
 scripts/              OAuth, secrets et diagnostic
 docs/                 guides opératoires

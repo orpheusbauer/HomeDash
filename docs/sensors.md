@@ -62,7 +62,7 @@ L’exemple [esp32-temperature.ino](../examples/esp32-temperature/esp32-temperat
 8. Vérifiez un code HTTP `202` toutes les 60 secondes.
 9. Changez les secrets copiés dans le sketch si celui-ci a été partagé par erreur.
 
-Le firmware d’exemple utilise HTTP sur le LAN car la gestion d’une CA privée sur microcontrôleur demande d’embarquer le certificat. Pour un réseau IoT non fiable, ajoutez le certificat Caddy à `WiFiClientSecure` ou placez les objets dans un VLAN isolé qui ne peut atteindre que le port nécessaire du Pi.
+Le firmware d’exemple utilise HTTP sur `192.168.1.124:4100` car la gestion d’une CA privée sur microcontrôleur demande d’embarquer le certificat. Nginx n’expose sur ce port que `POST /api/v1/sensors/ingest` et refuse les autres routes. Le token circule néanmoins en clair : pour un réseau IoT non fiable, ajoutez la CA HomeDash à `WiFiClientSecure` ou placez les objets dans un VLAN isolé qui ne peut atteindre que ce port du Pi.
 
 ## États et valeurs obsolètes
 
@@ -70,7 +70,7 @@ Un capteur reçu est `online`. La prochaine étape de stabilisation doit ajouter
 
 ## MQTT et ESPHome
 
-MQTT n’est volontairement pas requis dans `0.1.0`. HTTP est suffisant pour quelques sondes envoyant une mesure par minute et évite Mosquitto, ACL et un second protocole temps réel.
+MQTT n’est volontairement pas requis dans `0.1.1`. HTTP est suffisant pour quelques sondes envoyant une mesure par minute et évite Mosquitto, ACL et un second protocole temps réel.
 
 Ajoutez MQTT lorsque vous aurez beaucoup de capteurs ou besoin de commandes bidirectionnelles : Mosquitto local, TLS ou VLAN, identifiants par appareil, topics `homedash/sensors/{id}/state`, adaptateur backend transformant le message vers le même modèle `Sensor`. L’UI et la base ne doivent pas connaître la source.
 

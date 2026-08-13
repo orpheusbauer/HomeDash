@@ -23,6 +23,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Verify native release packaging
+        run: |
+          bash deployment/raspberry-pi-zero/package-native.sh 0.0.0 "$RUNNER_TEMP/native-package"
+          mkdir "$RUNNER_TEMP/native-smoke"
+          tar -xzf "$RUNNER_TEMP/native-package/homedash-native-0.0.0.tar.gz" -C "$RUNNER_TEMP/native-smoke"
+          cd "$RUNNER_TEMP/native-smoke"
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund --workspace @homedash/server
+          node -e "import('./apps/server/dist/app.js').then(({ createApp }) => createApp()).then(app => app.close())"
 
   android:
     runs-on: ubuntu-latest

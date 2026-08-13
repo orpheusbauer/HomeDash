@@ -5,7 +5,7 @@
 // Copiez ce fichier en dehors de Git puis renseignez vos secrets localement.
 const char* WIFI_SSID = "VOTRE_WIFI";
 const char* WIFI_PASSWORD = "VOTRE_MOT_DE_PASSE";
-const char* HOMEDASH_URL = "http://192.168.1.50:4100/api/v1/sensors/ingest";
+const char* HOMEDASH_URL = "http://192.168.1.124:4100/api/v1/sensors/ingest";
 const char* SENSOR_TOKEN = "VOTRE_HOMEDASH_SENSOR_INGEST_TOKEN";
 constexpr int DHT_PIN = 4;
 DHT dht(DHT_PIN, DHT22);

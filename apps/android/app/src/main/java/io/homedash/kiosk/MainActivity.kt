@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
         val padding = (24 * resources.displayMetrics.density).toInt()
         val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(padding, padding, padding, padding) }
         val title = TextView(this).apply { text = "Configurer HomeDash"; textSize = 26f; gravity = Gravity.CENTER }
-        val url = EditText(this).apply { hint = "Adresse, ex. https://homedash.home.arpa"; setText(preferences.getString("serverUrl", "http://192.168.1.50")); isSingleLine = true }
+        val url = EditText(this).apply { hint = "Adresse, ex. https://homedash.home.arpa"; setText(preferences.getString("serverUrl", "http://192.168.1.124")); isSingleLine = true }
         val code = EditText(this).apply { hint = "Code d’association à 6 chiffres"; inputType = 2; isSingleLine = true }
         val name = EditText(this).apply { hint = "Nom de la tablette"; setText("Tablette murale"); isSingleLine = true }
         val button = Button(this).apply { text = "Associer et ouvrir" }

@@ -30,13 +30,3 @@ updates:
     ignore:
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
-  - package-ecosystem: docker
-    directory: /deployment/docker
-    schedule: { interval: weekly }
-    groups:
-      docker-minor-and-patch:
-        patterns: ['*']
-        update-types: [minor, patch]
-    ignore:
-      - dependency-name: '*'
-        update-types: ['version-update:semver-major']

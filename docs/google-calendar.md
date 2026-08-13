@@ -53,7 +53,7 @@ Puis :
 
 ```bash
 sudo systemctl restart homedash
-sudo docker logs --since 2m homedash
+sudo journalctl -u homedash --since '2 minutes ago' --no-pager
 ```
 
 Dans Paramètres, Google Calendar doit être indiqué comme configuré. Ajoutez ensuite le widget **Calendrier**. Par défaut il lit `primary`. Dans la configuration du widget, saisissez plusieurs IDs séparés par des virgules si nécessaire.

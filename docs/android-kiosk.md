@@ -48,12 +48,12 @@ L’APK se trouve dans `apps/android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## 4. Installer le certificat HTTPS du Raspberry Pi
 
-Copiez `homedash-caddy-root.crt` sur la tablette. Sur Android 10 :
+Copiez le certificat public `/var/lib/homedash/tls/root-ca.crt` du Pi sur la tablette et nommez-le par exemple `homedash-root-ca.crt`. Sur Android 10 :
 
 1. Réglages > Sécurité > Chiffrement et identifiants ;
 2. **Installer un certificat** > **Certificat d’autorité de certification** ;
 3. confirmez l’avertissement ;
-4. choisissez `homedash-caddy-root.crt` ;
+4. choisissez `homedash-root-ca.crt` ;
 5. si Android l’exige, définissez un verrouillage local (un simple PIN conservé dans votre gestionnaire de mots de passe).
 
 L’application autorise explicitement les CA utilisateur dans `network_security_config.xml`. Le build debug permet aussi HTTP pour le tout premier diagnostic LAN ; le build release le refuse. Testez l’URL dans Chrome : aucune alerte TLS ne doit rester. Ne contournez pas les erreurs SSL dans le code du WebView.
@@ -68,7 +68,7 @@ adb shell am start -n io.homedash.kiosk/.MainActivity
 Sur la tablette :
 
 1. autorisez la caméra ;
-2. saisissez `https://homedash.home.arpa` ou l’adresse Caddy choisie ;
+2. saisissez `https://192.168.1.124` ou `https://homedash.local` si ce nom fonctionne sur votre réseau ;
 3. sur HomeDash depuis le PC, ouvrez Paramètres > déverrouillez > Tablettes > **Associer une tablette** ;
 4. saisissez le code à six chiffres dans l’application et nommez l’appareil ;
 5. touchez **Associer et ouvrir** ;
@@ -153,7 +153,7 @@ Effectuez chaque test et notez le résultat :
 
 - Afficher les logs : `adb logcat | Select-String -Pattern 'HomeDash|CameraX|AndroidRuntime'` sous PowerShell.
 - WebView blanc : mettez Android System WebView/Chrome à jour si possible, puis testez l’URL dans Chrome.
-- `NET::ERR_CERT_AUTHORITY_INVALID` : la CA Caddy n’est pas installée ou le nom demandé ne correspond pas au certificat.
+- `NET::ERR_CERT_AUTHORITY_INVALID` : la CA HomeDash n’est pas installée, l’heure est incorrecte ou le nom/IP demandé ne correspond pas au certificat.
 - Caméra refusée : Réglages > Applications > HomeDash > Autorisations > Caméra.
 - Service tué : retirez l’optimisation batterie et vérifiez la notification permanente.
 - Association refusée : régénérez un code et vérifiez l’heure du Pi/tablette.

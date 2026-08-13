@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${EUID}" -ne 0 || "$#" -ne 1 ]]; then
+  echo "Usage: sudo $0 vX.Y.Z" >&2
+  exit 1
+fi
+
+readonly TAG="$1"
+readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+readonly DEPLOYMENT_DIRECTORY="${PROJECT_ROOT}/deployment/raspberry-pi-zero"
+
+if [[ "$(uname -m)" != "armv6l" || "$(getconf LONG_BIT)" != "32" ]]; then
+  echo "Cette installation exige un Raspberry Pi Zero/Zero W original, armv6l 32 bits." >&2
+  echo "Détecté: $(uname -m), $(getconf LONG_BIT) bits." >&2
+  exit 1
+fi
+if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "Tag invalide: ${TAG}. Format attendu: vX.Y.Z" >&2
+  exit 1
+fi
+
+apt-get update
+apt-get install -y ca-certificates curl git jq nginx openssl xz-utils
+
+bash "${DEPLOYMENT_DIRECTORY}/install-node-armv6.sh"
+
+getent group homedash >/dev/null || groupadd --system homedash
+id homedash >/dev/null 2>&1 || useradd --system --gid homedash \
+  --home-dir /var/lib/homedash --shell /usr/sbin/nologin homedash
+
+install -d -o root -g root -m 0755 /opt/homedash /opt/homedash/releases
+install -d -o homedash -g homedash -m 0750 /var/lib/homedash /var/lib/homedash/data /var/lib/homedash/data/backups
+install -d -o root -g homedash -m 0750 /etc/homedash
+
+install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/update-native.sh" /usr/local/sbin/homedash-update-native
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-zero.service" /etc/systemd/system/homedash.service
+
+ip_address="${HOMEDASH_IP_ADDRESS:-$(ip -4 route get 1.1.1.1 | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')}"
+host_name="${HOMEDASH_HOSTNAME:-$(hostname).local}"
+if [[ ! "${host_name}" =~ ^[A-Za-z0-9.-]+$ || ! "${ip_address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+  echo "Impossible de déterminer un nom d'hôte ou une IPv4 valides." >&2
+  echo "Relancez avec HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 sudo -E …" >&2
+  exit 1
+fi
+
+if [[ ! -f /etc/homedash/homedash.env ]]; then
+  admin_token="$(openssl rand -hex 32)"
+  sensor_token="$(openssl rand -hex 32)"
+  encryption_key="$(openssl rand -hex 32)"
+  cat > /etc/homedash/homedash.env <<EOF
+NODE_ENV=production
+HOMEDASH_HOST=127.0.0.1
+HOMEDASH_PORT=4100
+HOMEDASH_DATABASE_PATH=/var/lib/homedash/data/homedash.db
+HOMEDASH_PUBLIC_URL=https://${ip_address}
+HOMEDASH_TIMEZONE=Europe/Paris
+HOMEDASH_ADMIN_TOKEN=${admin_token}
+HOMEDASH_SENSOR_INGEST_TOKEN=${sensor_token}
+HOMEDASH_ENCRYPTION_KEY=${encryption_key}
+HOMEDASH_GITHUB_REPOSITORY=orpheusbauer/HomeDash
+HOMEDASH_GITHUB_TOKEN_FILE=/etc/homedash/github-token
+HOMEDASH_SYSTEM_METRICS_INTERVAL_MS=30000
+HOMEDASH_ENABLE_MOCK_SENSORS=false
+EOF
+  chown root:homedash /etc/homedash/homedash.env
+  chmod 0640 /etc/homedash/homedash.env
+fi
+
+if [[ -f /etc/homedash/github-token ]]; then
+  chown root:homedash /etc/homedash/github-token
+  chmod 0640 /etc/homedash/github-token
+fi
+
+bash "${DEPLOYMENT_DIRECTORY}/generate-tls.sh" "${host_name}" "${ip_address}"
+sed \
+  -e "s/__HOMEDASH_HOSTNAME__/${host_name}/g" \
+  -e "s/__HOMEDASH_IP_ADDRESS__/${ip_address}/g" \
+  "${DEPLOYMENT_DIRECTORY}/nginx-homedash.conf" > /etc/nginx/sites-available/homedash
+ln -sfn /etc/nginx/sites-available/homedash /etc/nginx/sites-enabled/homedash
+if [[ -e /etc/nginx/sites-enabled/default && ! -e /etc/nginx/sites-enabled/default.disabled-by-homedash ]]; then
+  mv /etc/nginx/sites-enabled/default /etc/nginx/sites-enabled/default.disabled-by-homedash
+fi
+nginx -t
+
+systemctl daemon-reload
+systemctl enable nginx.service homedash.service
+systemctl restart nginx.service
+/usr/local/sbin/homedash-update-native "${TAG}"
+
+echo
+echo "Installation terminée."
+echo "Interface: https://${ip_address} ou https://${host_name}"
+echo "CA à copier sur la tablette: /var/lib/homedash/tls/root-ca.crt"
+echo "Diagnostic: sudo systemctl status homedash nginx --no-pager"

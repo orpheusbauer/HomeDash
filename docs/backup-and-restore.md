@@ -1,68 +1,174 @@
-# Sauvegarde et restauration
+# Sauvegarde et restauration — installation native Pi Zero
 
-Les données et la version active (`release.env`) sont sous `/var/lib/homedash/data`. La configuration secrète est `/etc/homedash/homedash.env`.
+Le code peut être retéléchargé depuis GitHub. Les éléments irremplaçables sont la base SQLite, la configuration secrète, le token GitHub du Pi et la clé privée de l’autorité locale.
 
-## Sauvegarde manuelle depuis HomeDash
+## Fichiers à protéger
 
-Paramètres > Sauvegardes > **Créer une sauvegarde** exécute `VACUUM INTO`, donc produit une base SQLite cohérente même lorsque l’application tourne. Les fichiers sont dans `/var/lib/homedash/data/backups`.
+```text
+/var/lib/homedash/data/
+/var/lib/homedash/tls/
+/etc/homedash/tls/
+/etc/homedash/homedash.env
+/etc/homedash/github-token
+```
 
-## Sauvegarde complète vers un autre ordinateur
+`/var/lib/homedash/tls/root-ca.key` permet de signer des certificats reconnus par la tablette : traitez-la comme un secret. L’archive contient aussi les tokens administrateur, capteurs, Google et GitHub.
 
-Sur le Pi :
+Le clone `/opt/homedash/repository` et les releases sous `/opt/homedash/releases` sont reproductibles et ne sont pas indispensables dans la sauvegarde de données.
+
+## Sauvegarde cohérente manuelle
+
+Arrêtez brièvement HomeDash pour fermer SQLite et consolider WAL :
 
 ```bash
 sudo systemctl stop homedash
-sudo tar -C / -czf /tmp/homedash-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
+sudo tar -C / -czf "/tmp/homedash-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz" \
   var/lib/homedash/data \
+  var/lib/homedash/tls \
+  etc/homedash/tls \
   etc/homedash/homedash.env \
-  etc/homedash/updater-token
+  etc/homedash/github-token
 sudo systemctl start homedash
-sudo chown votre-utilisateur:votre-utilisateur /tmp/homedash-backup-*.tar.gz
+curl --fail http://127.0.0.1:4100/health/ready
 ```
 
-Copiez l’archive avec `scp`, vérifiez qu’elle s’ouvre, puis supprimez la copie `/tmp`. Stockez-la chiffrée : elle contient des tokens Google, administrateur, capteurs et updater. Ne l’envoyez pas dans GitHub.
-
-Au minimum, programmez une copie hebdomadaire vers un NAS ou le PC. Une future tâche systemd pourra automatiser la rétention ; `0.1.0` évite de supprimer automatiquement des sauvegardes sans politique décidée.
-
-## Vérifier une base
-
-Sur une copie, jamais sur l’unique original :
+Repérez le nom créé :
 
 ```bash
-sqlite3 copie-homedash.db 'PRAGMA integrity_check;'
+sudo ls -lh /tmp/homedash-backup-*.tar.gz
 ```
 
-La réponse doit être `ok`.
+Pour permettre à votre utilisateur de le récupérer :
 
-## Restaurer une base sur le même Pi
+```bash
+BACKUP_FILE="$(sudo ls -1t /tmp/homedash-backup-*.tar.gz | head -n 1)"
+sudo chown "$USER:$USER" "$BACKUP_FILE"
+chmod 0600 "$BACKUP_FILE"
+echo "$BACKUP_FILE"
+```
 
-1. Choisissez le fichier exact et notez sa date.
-2. Arrêtez HomeDash.
-3. Conservez la base actuelle sous un autre nom.
-4. Copiez la sauvegarde.
-5. Corrigez propriétaire et permissions.
-6. Redémarrez et testez.
+Depuis le PC :
+
+```powershell
+scp votre-utilisateur@192.168.1.124:/tmp/homedash-backup-AAAAmmjjTHHMMSSZ.tar.gz .
+```
+
+Ouvrez l’archive sur le PC pour vérifier qu’elle n’est pas corrompue, puis supprimez la copie temporaire du Pi :
+
+```bash
+rm /tmp/homedash-backup-AAAAmmjjTHHMMSSZ.tar.gz
+```
+
+Conservez au moins deux copies chiffrées sur des supports différents. Ne placez jamais l’archive dans GitHub.
+
+## Sauvegardes automatiques avant mise à jour
+
+`homedash-update-native` arrête le service et crée automatiquement :
+
+```text
+/var/lib/homedash/data/backups/pre-X.Y.Z-AAAAmmjjTHHMMSSZ.tar.gz
+```
+
+Ces archives ne contiennent que les données applicatives. Elles ne remplacent pas une sauvegarde externe incluant `/etc/homedash` et `/var/lib/homedash/tls`.
+
+Liste et espace utilisé :
+
+```bash
+sudo ls -lh /var/lib/homedash/data/backups
+sudo du -sh /var/lib/homedash/data/backups
+df -h /
+```
+
+## Restaurer uniquement SQLite après une mise à jour ratée
+
+Choisissez l’archive immédiatement antérieure à la version problématique :
 
 ```bash
 sudo systemctl stop homedash
-sudo cp /var/lib/homedash/data/homedash.db /var/lib/homedash/data/homedash.db.before-restore
-sudo cp /var/lib/homedash/data/backups/homedash-DATE.db /var/lib/homedash/data/homedash.db
-sudo chown homedash-updater:homedash /var/lib/homedash/data/homedash.db
-sudo chmod 0660 /var/lib/homedash/data/homedash.db
+sudo cp -a /var/lib/homedash/data/homedash.db "/tmp/homedash.db.before-restore" 2>/dev/null || true
+sudo rm -f /var/lib/homedash/data/homedash.db \
+  /var/lib/homedash/data/homedash.db-shm \
+  /var/lib/homedash/data/homedash.db-wal
+sudo tar -xzf /var/lib/homedash/data/backups/pre-0.2.0-AAAAmmjjTHHMMSSZ.tar.gz \
+  -C /var/lib/homedash/data
+sudo chown -R homedash:homedash /var/lib/homedash/data
 sudo systemctl start homedash
-curl -fsS http://127.0.0.1:4100/health/ready
+curl --fail http://127.0.0.1:4100/health/ready
 ```
 
-Les fichiers `-wal` et `-shm` ne doivent pas être recopiés depuis une sauvegarde incohérente. Avec le service arrêté, supprimez uniquement ceux qui correspondent à la base remplacée si SQLite les a laissés ; conservez-les d’abord dans un dossier de secours si vous avez un doute.
+Ne restaurez pas une base ancienne sous un code exigeant une migration plus récente sans avoir aussi choisi la release correspondante.
 
-## Restaurer sur un Raspberry Pi neuf
+## Revenir au code précédent
 
-1. réinstallez OS, Docker, Node et le même tag HomeDash ;
-2. ne démarrez pas encore le stack ;
-3. restaurez `/etc/homedash` avec mode 0600/0640 ;
-4. restaurez `/var/lib/homedash/data` ;
-5. restaurez `release.env` ou choisissez le tag connu ;
-6. relancez `install-services.sh` ;
-7. démarrez les services et vérifiez la santé ;
-8. si l’autorité Caddy a changé, réinstallez sa nouvelle CA sur la tablette ;
-9. les tablettes gardent leur token si la base restaurée le contient, sinon réassociez-les.
+```bash
+sudo systemctl stop homedash
+sudo ln -sfn /opt/homedash/releases/0.1.1 /opt/homedash/current
+sudo systemctl start homedash
+readlink -f /opt/homedash/current
+curl --fail http://127.0.0.1:4100/health/ready
+```
+
+Si le schéma a changé, restaurez ensuite la sauvegarde SQLite correspondante comme ci-dessus.
+
+## Restaurer tout HomeDash sur une nouvelle carte microSD
+
+1. Installez Raspberry Pi OS Lite 32 bits et réservez la même IP.
+2. Suivez les étapes d’accès Git et clone du [guide d’installation](installation-raspberry-pi.md).
+3. Installez la même release que celle indiquée par votre sauvegarde.
+4. Copiez l’archive de sauvegarde sur le Pi, par exemple `/tmp/restore.tar.gz`.
+5. Arrêtez les services :
+
+```bash
+sudo systemctl stop homedash nginx
+```
+
+6. Conservez les fichiers fraîchement générés en secours :
+
+```bash
+sudo tar -C / -czf /tmp/fresh-install-secrets.tar.gz \
+  var/lib/homedash/data var/lib/homedash/tls etc/homedash
+```
+
+7. Inspectez l’archive avant extraction :
+
+```bash
+tar -tzf /tmp/restore.tar.gz
+```
+
+Les chemins doivent commencer uniquement par `var/lib/homedash/` ou `etc/homedash/`. Aucun chemin ne doit commencer par `/` ni contenir `..`.
+
+8. Extrayez et rétablissez les permissions :
+
+```bash
+sudo tar -C / -xzf /tmp/restore.tar.gz
+sudo chown -R homedash:homedash /var/lib/homedash/data
+sudo chown root:homedash /etc/homedash/homedash.env /etc/homedash/github-token
+sudo chmod 0640 /etc/homedash/homedash.env /etc/homedash/github-token
+sudo chown root:www-data /etc/homedash/tls/homedash.key /etc/homedash/tls/homedash.crt
+sudo chmod 0640 /etc/homedash/tls/homedash.key
+```
+
+9. Testez puis redémarrez :
+
+```bash
+sudo nginx -t
+sudo systemctl start nginx homedash
+curl --fail http://127.0.0.1:4100/health/ready
+curl --fail --cacert /var/lib/homedash/tls/root-ca.crt https://192.168.1.124/health/ready
+```
+
+10. Vérifiez les notes, appareils, tokens capteurs et Google Calendar.
+
+Si la même CA et le même nom/IP ont été restaurés, la tablette conserve sa confiance HTTPS. Si la base restaurée contient aussi les appareils, leur association peut rester valable ; sinon réassociez-les.
+
+## Après perte ou vol d’une sauvegarde
+
+Considérez comme compromis :
+
+- le token administrateur ;
+- le token d’ingestion capteur ;
+- le token GitHub ;
+- les identifiants Google OAuth ;
+- la clé de l’autorité locale.
+
+Révoquez/renouvelez ces éléments. Pour remplacer la CA, régénérez-la, recréez le certificat Nginx et installez la nouvelle racine sur chaque appareil.

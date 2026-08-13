@@ -1,64 +1,132 @@
-# Architecture et décisions
+# Architecture et décisions — cible Raspberry Pi Zero ARMv6
 
-## Flux général
+## Vue d’ensemble
 
 ```text
-PC de développement -> GitHub Actions -> GHCR + GitHub Release
-                                            |
-                                            v
-Tablette Android <---- HTTPS/WebSocket ---- Raspberry Pi
-        |                                   |-- Fastify/API
-        |                                   |-- React statique
-        |                                   |-- SQLite + cache
-        |                                   `-- agent de mise à jour isolé
-        `-- caméra/présence locale
+PC de développement
+  -> push/tag GitHub
+  -> GitHub Actions construit TypeScript + Vite + APK
+  -> GitHub Release publie archive native + SHA-256
+
+Tablette Android
+  <-> HTTPS / WebSocket
+Nginx natif sur le Pi Zero
+  <-> HTTP loopback 127.0.0.1:4100
+Node.js/Fastify natif
+  <-> SQLite local
 ```
 
-Le Raspberry Pi est la source de vérité. La tablette est remplaçable et ne conserve que l’adresse du serveur, son identifiant et son token propre.
+Le Raspberry Pi est la source de vérité. La tablette conserve seulement l’adresse, son identifiant et son token. Les images de caméra utilisées pour la présence restent en mémoire sur la tablette et ne sont pas envoyées au Pi.
 
-## Choix principaux
+## Pourquoi Docker a été retiré de cette cible
 
-- **React + TypeScript + Vite** : interface composable, compilation légère et compatibilité avec le WebView Chrome d’Android 10 via le bundle legacy.
-- **GridStack** : interactions tactiles de grille matures sans réimplémenter drag/resize.
-- **Fastify** : API compacte, validation et plugins de sécurité explicites.
-- **`node:sqlite`** : aucune compilation native sur le Raspberry Pi, une seule base locale et transactions simples. Drizzle décrit le schéma, les migrations SQL restent explicites.
-- **REST + WebSocket** : REST pour les commandes et données ; un seul canal WebSocket pour invalider ou pousser les valeurs. MQTT n’est pas obligatoire pour le MVP.
-- **Open-Meteo** : pas de clé côté client ni d’abonnement ; cache serveur et retour de la dernière valeur en cas de coupure.
-- **Docker Compose + images par digest** : installation reproductible. Le serveur n’accède jamais au socket Docker.
-- **Agent de mise à jour systemd** : seul ce petit processus peut appeler Docker. Il accepte uniquement une image GHCR autorisée et un digest SHA-256 issu d’une release.
-- **Kotlin/WebView** : le web porte toute l’interface ; le natif reste limité au kiosque, boot, écran, caméra et télémétrie.
+Le Zero original utilise un BCM2835 ARMv6 monocœur avec 512 Mo. Les images officielles modernes visent principalement ARMv7/ARM64, et Docker ajouterait mémoire, espace disque, couche réseau et complexité de build. HomeDash s’exécute donc comme un processus Node non privilégié sous `systemd`.
 
-## Modèle de widget
+Les anciens fichiers `deployment/docker` peuvent rester dans le dépôt comme référence pour une future machine ARM64, mais ils ne font plus partie du chemin de release et d’installation du Zero.
 
-Un `WidgetManifest` décrit identifiant, version, icône, catégorie, tailles, schéma de configuration, permissions et stratégie de rafraîchissement. Une `WidgetInstance` relie ce manifeste à une page, une position et une configuration JSON. Le registre visuel est dans `WidgetRenderer.tsx`, le catalogue serveur dans `widget-catalog.ts`.
+## Build déporté hors du Pi
 
-Le MVP utilise un registre compilé, volontairement plus simple et plus sûr qu’un chargement dynamique de code. Ajouter un widget touche le catalogue et le registre, pas le moteur de pages, de grille ou de persistance.
+Le Zero ne doit pas exécuter :
 
-## Données et résilience
+- TypeScript (`tsc`) ;
+- Vite/Rolldown/esbuild ;
+- Gradle/Android SDK ;
+- les dépendances de développement npm.
 
-SQLite contient pages, instances, historiques de layout, notes, capteurs, cache externe, paramètres et tablettes. Le journal WAL, les clés étrangères et un délai d’attente de verrou sont activés. Les écritures de layout et de notes utilisent une révision optimiste : une tablette ancienne ne peut pas écraser silencieusement une valeur plus récente.
+Le workflow de release construit ces éléments sur GitHub puis crée une archive contenant uniquement les `dist`, les manifests npm et le lockfile. Sur le Pi, `npm ci --omit=dev --ignore-scripts` installe les dépendances JavaScript d’exécution. `node:sqlite` évite tout module SQLite natif à compiler.
 
-La météo et Calendar rendent les dernières données en cache avec l’état `stale` lorsque l’accès Internet échoue. Le service worker conserve l’enveloppe applicative ; les fonctions locales continuent sur le LAN.
+## Node.js sur ARMv6
+
+Node.js 22 fournit l’API `node:sqlite` requise par HomeDash, mais le projet Node officiel ne publie pas de binaire ARMv6. `install-node-armv6.sh` utilise le projet communautaire `nodejs/unofficial-builds`, version `22.23.1`, optimisée pour `armv6zk`.
+
+Mesures de réduction du risque :
+
+- URL et version épinglées ;
+- SHA-256 attendu codé dans le script ;
+- vérification avant extraction ;
+- test de `node:sqlite` après installation ;
+- aucun paquet natif npm ;
+- ancienne version Node conservée sous `/opt` lors d’un futur changement.
+
+Cette dépendance non officielle est le principal risque de pérennité. Un Zero 2 W supprime cette contrainte.
+
+## Processus et privilèges
+
+### `homedash.service`
+
+- utilisateur/groupe `homedash` sans shell ;
+- code en lecture seule sous `/opt/homedash/current` ;
+- écriture uniquement dans `/var/lib/homedash/data` ;
+- heap Node limité à 192 Mo ;
+- limite `systemd` à 400 Mo ;
+- redémarrage sur échec ;
+- restrictions kernel, home, privilèges et tâches.
+
+### Nginx
+
+- ports 80/443 côté LAN ;
+- redirection HTTP vers HTTPS pour l’interface ;
+- terminaison TLS avec une CA locale ;
+- proxy WebSocket et HTTP vers `127.0.0.1:4100` ;
+- écoute de l’IP LAN sur le port 4100 uniquement pour l’ingestion ESP32 ;
+- toutes les autres routes externes sur 4100 sont refusées.
+
+Le serveur Fastify n’écoute jamais directement sur toutes les interfaces.
+
+## Données
+
+SQLite contient pages, instances de widgets, historiques de layout, notes, capteurs, cache externe, paramètres et tablettes. WAL, clés étrangères et délai d’attente sont activés. Les écritures de layout et notes utilisent une révision optimiste.
+
+Chemins :
+
+```text
+/var/lib/homedash/data/homedash.db
+/var/lib/homedash/data/homedash.db-wal
+/var/lib/homedash/data/homedash.db-shm
+```
+
+Les mises à jour arrêtent le processus avant la sauvegarde afin de produire une copie cohérente et permettre un rollback de migration.
+
+## Releases atomiques
+
+```text
+/opt/homedash/releases/0.1.1
+/opt/homedash/releases/0.2.0
+/opt/homedash/current -> /opt/homedash/releases/0.2.0
+```
+
+L’updater SSH télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.
+
+Le serveur web n’a aucun droit `sudo` et ne peut pas déclencher cette opération. L’installation depuis l’interface est donc désactivée sur cette première architecture native.
+
+## HTTPS local
+
+Une CA HomeDash est créée une seule fois sous `/var/lib/homedash/tls`. Elle signe un certificat Nginx contenant :
+
+- `DNS:homedash.local` ;
+- `IP:192.168.1.124`.
+
+Seul `root-ca.crt` est exporté vers la tablette. La clé `root-ca.key` et la clé serveur restent sur le Pi et dans les sauvegardes chiffrées.
+
+## Contraintes de performance retenues
+
+- une tablette principale ;
+- quelques clients navigateur occasionnels ;
+- capteurs envoyant au plus quelques mesures par minute ;
+- métriques système toutes les 30 secondes ;
+- mocks périodiques désactivés en production ;
+- pas de navigateur ni de compilation sur le Pi ;
+- pas de reconnaissance faciale ;
+- pas de traitement d’image sur le serveur.
+
+Une augmentation importante du nombre de clients, widgets temps réel ou intégrations justifie un Zero 2 W ou un Pi plus récent plutôt qu’une complexification du logiciel.
 
 ## Frontières de sécurité
 
-- Les lectures quotidiennes sont accessibles sur le LAN ; pages, widgets, Calendar en écriture, appareils, backups et mises à jour exigent `X-HomeDash-Admin`.
-- L’ingestion capteur utilise un jeton distinct `X-HomeDash-Sensor`.
-- Chaque tablette reçoit après un code unique de six chiffres un jeton aléatoire affiché une seule fois, stocké haché côté serveur.
-- Le token administrateur reste en mémoire/sessionStorage du navigateur et n’est jamais injecté dans le bundle.
-- Helmet, limites de corps, rate limiting, Zod et requêtes SQLite paramétrées limitent les entrées malformées.
-- Caddy termine TLS. L’API n’est publiée que sur `127.0.0.1:4100` sur l’hôte.
-- Le conteneur applicatif est non-root, read-only, sans capabilities. L’agent privilégié est séparé et authentifié par socket Unix + token fichier.
-
-Le LAN ne doit pas être considéré comme parfaitement sûr : isolez les objets connectés dans un VLAN si possible, n’exposez ni 4100 ni le socket Docker, et ne redirigez pas 80/443 depuis Internet.
-
-## API résumée
-
-Toutes les routes sont sous `/api/v1` :
-
-- `bootstrap`, `pages`, `widgets`, `notes` : dashboard ;
-- `weather`, `calendar`, `system`, `network`, `sensors` : données ;
-- `devices/pairing`, `devices/pair`, `devices/:id/telemetry` : tablette ;
-- `backups`, `updates/check`, `updates/install`, `updates/status` : exploitation ;
-- `realtime` : WebSocket ;
-- `/health/live` et `/health/ready` : supervision.
+- N’exposez aucun port du Pi sur Internet.
+- Réservez l’adresse du Pi dans le routeur.
+- Utilisez SSH par clé et une Deploy key GitHub en lecture seule.
+- Le PAT Releases est limité à `Contents: Read-only` et au seul dépôt.
+- Isolez idéalement les objets connectés dans un VLAN IoT.
+- Le port ESP32 en HTTP transmet un token en clair : autorisez-le seulement depuis ce VLAN ou migrez l’ESP32 vers HTTPS.
+- Sauvegardez `/etc/homedash` et `/var/lib/homedash/tls` chiffrés hors du Pi.
