@@ -45,7 +45,6 @@ if [[ ! "${host_name}" =~ ^[A-Za-z0-9.-]+$ || ! "${ip_address}" =~ ^([0-9]{1,3}\
 fi
 
 if [[ ! -f /etc/homedash/homedash.env ]]; then
-  admin_token="$(openssl rand -hex 32)"
   sensor_token="$(openssl rand -hex 32)"
   encryption_key="$(openssl rand -hex 32)"
   cat > /etc/homedash/homedash.env <<EOF
@@ -55,7 +54,7 @@ HOMEDASH_PORT=4100
 HOMEDASH_DATABASE_PATH=/var/lib/homedash/data/homedash.db
 HOMEDASH_PUBLIC_URL=https://${ip_address}
 HOMEDASH_TIMEZONE=Europe/Paris
-HOMEDASH_ADMIN_TOKEN=${admin_token}
+HOMEDASH_ADMIN_PIN=0000
 HOMEDASH_SENSOR_INGEST_TOKEN=${sensor_token}
 HOMEDASH_ENCRYPTION_KEY=${encryption_key}
 HOMEDASH_GITHUB_REPOSITORY=orpheusbauer/HomeDash
@@ -63,9 +62,13 @@ HOMEDASH_GITHUB_TOKEN_FILE=/etc/homedash/github-token
 HOMEDASH_SYSTEM_METRICS_INTERVAL_MS=30000
 HOMEDASH_ENABLE_MOCK_SENSORS=false
 EOF
-  chown root:homedash /etc/homedash/homedash.env
-  chmod 0640 /etc/homedash/homedash.env
 fi
+
+# Migration des premières installations et application du PIN demandé.
+sed -i -e '/^HOMEDASH_ADMIN_TOKEN=/d' -e '/^HOMEDASH_ADMIN_PIN=/d' /etc/homedash/homedash.env
+printf '\nHOMEDASH_ADMIN_PIN=0000\n' >> /etc/homedash/homedash.env
+chown root:homedash /etc/homedash/homedash.env
+chmod 0640 /etc/homedash/homedash.env
 
 if [[ -f /etc/homedash/github-token ]]; then
   chown root:homedash /etc/homedash/github-token

@@ -26,18 +26,18 @@ git push origin main
 
 Dans GitHub, ouvrez **Actions > CI**. Le dernier run de `main` doit avoir les jobs `web-server` et `android` verts. Le job web vérifie aussi que l’archive native peut être créée et démarrée.
 
-Le tag `v0.1.0` existe déjà et ne doit pas être déplacé. Cette adaptation native est publiée en `v0.1.1` :
+Les tags `v0.1.0` et `v0.1.1` existent déjà et ne doivent pas être déplacés. La version avec accès administrateur par PIN est publiée en `v0.1.2` :
 
 ```powershell
-git tag -a v0.1.1 -m "HomeDash 0.1.1 — Raspberry Pi Zero natif"
-git push origin v0.1.1
+git tag -a v0.1.2 -m "HomeDash 0.1.2 — accès administrateur par PIN"
+git push origin v0.1.2
 ```
 
 Attendez ensuite le workflow **Release**. La release doit contenir au minimum :
 
-- `homedash-native-0.1.1.tar.gz` ;
-- `homedash-native-0.1.1.tar.gz.sha256` ;
-- `homedash-kiosk-0.1.1-debug.apk`.
+- `homedash-native-0.1.2.tar.gz` ;
+- `homedash-native-0.1.2.tar.gz.sha256` ;
+- `homedash-kiosk-0.1.2-debug.apk`.
 
 Ne poursuivez pas l’installation si l’archive native ou son fichier SHA-256 manque.
 
@@ -147,11 +147,11 @@ sudo install -d -o "$USER" -g "$USER" -m 0755 /opt/homedash
 git clone git@github-homedash:orpheusbauer/HomeDash.git /opt/homedash/repository
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.1.1
+git checkout v0.1.2
 git status --short --branch
 ```
 
-Le statut doit être propre et indiquer le tag ou le commit de `v0.1.1`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release.
+Le statut doit être propre et indiquer le tag ou le commit de `v0.1.2`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release.
 
 ## 7. Créer un token GitHub limité pour télécharger la release privée
 
@@ -183,7 +183,7 @@ Toujours depuis le clone :
 ```bash
 cd /opt/homedash/repository
 sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.1.1
+  bash deployment/raspberry-pi-zero/install-native.sh v0.1.2
 ```
 
 Le script effectue les opérations suivantes :
@@ -193,10 +193,10 @@ Le script effectue les opérations suivantes :
 3. vérifie le hash SHA-256 du binaire avant extraction ;
 4. teste réellement `node:sqlite` ;
 5. crée l’utilisateur système non connecté `homedash` ;
-6. génère trois secrets aléatoires dans `/etc/homedash/homedash.env` ;
+6. configure le PIN administrateur `0000` et génère deux secrets aléatoires dans `/etc/homedash/homedash.env` ;
 7. crée une autorité de certification locale et un certificat pour `homedash.local` et `192.168.1.124` ;
 8. configure Nginx ;
-9. télécharge l’archive `v0.1.1` et son SHA-256 depuis GitHub ;
+9. télécharge l’archive `v0.1.2` et son SHA-256 depuis GitHub ;
 10. installe uniquement les dépendances de production du serveur, sans les bibliothèques de build/front déjà compilé et avec les scripts npm désactivés ;
 11. démarre HomeDash et attend `/health/ready` ;
 12. restaure automatiquement la version/base précédente si le health check échoue.
@@ -219,7 +219,7 @@ Valeurs attendues :
 
 - Node `v22.23.1` ;
 - architecture Node `arm` ;
-- version installée `0.1.1` ;
+- version installée `0.1.2` ;
 - services `active (running)` ;
 - deux réponses de santé HTTP 200.
 
@@ -227,7 +227,7 @@ Les fichiers importants sont :
 
 ```text
 /opt/homedash/repository             clone Git et scripts
-/opt/homedash/releases/0.1.1         application précompilée
+/opt/homedash/releases/0.1.2         application précompilée
 /opt/homedash/current                lien vers la release active
 /etc/homedash/homedash.env           secrets et configuration
 /etc/homedash/github-token           token GitHub lecture seule
@@ -265,7 +265,7 @@ Testez ensuite `https://192.168.1.124` dans Chrome sur la tablette. Il ne doit r
 
 ## 11. Installer et associer l’application Android
 
-Téléchargez `homedash-kiosk-0.1.1-debug.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md).
+Téléchargez `homedash-kiosk-0.1.2-debug.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md).
 
 Dans l’écran de configuration de l’application, utilisez :
 
@@ -276,19 +276,19 @@ https://192.168.1.124
 Dans HomeDash depuis un navigateur administrateur :
 
 1. ouvrez les paramètres ;
-2. déverrouillez avec `HOMEDASH_ADMIN_TOKEN` lu sur le Pi ;
+2. saisissez le code PIN administrateur `0000` ;
 3. créez un code d’association ;
 4. saisissez ce code sur la tablette ;
 5. accordez les permissions nécessaires ;
 6. vérifiez la remontée batterie/charge et la détection de présence.
 
-Pour afficher ponctuellement le token administrateur :
+Le PIN est configuré dans `/etc/homedash/homedash.env`. Pour vérifier sa présence :
 
 ```bash
-sudo sed -n 's/^HOMEDASH_ADMIN_TOKEN=//p' /etc/homedash/homedash.env
+sudo grep '^HOMEDASH_ADMIN_PIN=' /etc/homedash/homedash.env
 ```
 
-Ne le photographiez pas et ne l’enregistrez pas dans Git.
+Le navigateur échange ce PIN contre une session aléatoire valable huit heures dans l’onglet courant. Le PIN n’est donc pas envoyé avec chaque modification. Cinq tentatives de déverrouillage par minute sont autorisées au maximum.
 
 ## 12. ESP32 et port capteur limité
 
@@ -387,7 +387,7 @@ Le binaire doit finir par `node-v22.23.1-linux-armv6l/bin/node`. N’installez p
 
 ### `npm ci` est tué
 
-Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.1.1`.
+Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.1.2`.
 
 ### Nginx ne démarre pas
 

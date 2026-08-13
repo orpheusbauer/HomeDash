@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { KeyRound } from 'lucide-react';
-import { verifyAdminToken } from '../api';
+import { unlockAdmin } from '../api';
 import { Modal } from './Modal';
 
 interface AdminDialogProps {
@@ -9,7 +9,7 @@ interface AdminDialogProps {
 }
 
 export function AdminDialog({ onSuccess, onClose }: AdminDialogProps) {
-  const [token, setToken] = useState('');
+  const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -17,7 +17,7 @@ export function AdminDialog({ onSuccess, onClose }: AdminDialogProps) {
     event.preventDefault();
     setLoading(true);
     setError('');
-    const valid = await verifyAdminToken(token);
+    const valid = await unlockAdmin(pin);
     setLoading(false);
     if (valid) onSuccess();
     else setError('Code administrateur incorrect.');
@@ -25,8 +25,8 @@ export function AdminDialog({ onSuccess, onClose }: AdminDialogProps) {
 
   return (
     <Modal
-      title="Déverrouiller le mode édition"
-      description="Ce code protège les changements importants sur votre réseau local."
+      title="Accès administrateur"
+      description="Saisissez votre code PIN à quatre chiffres pour accéder aux paramètres et modifier HomeDash."
       onClose={onClose}
     >
       <form onSubmit={(event) => void submit(event)} className="form-stack">
@@ -39,16 +39,20 @@ export function AdminDialog({ onSuccess, onClose }: AdminDialogProps) {
           tabIndex={-1}
         />
         <label className="field">
-          <span>Code administrateur</span>
+          <span>Code PIN</span>
           <div className="input-with-icon">
             <KeyRound size={20} />
             <input
               autoFocus
               type="password"
-              value={token}
-              onChange={(event) => setToken(event.target.value)}
-              autoComplete="current-password"
-              placeholder="Votre jeton HomeDash"
+              value={pin}
+              onChange={(event) => setPin(event.target.value.replace(/\D/g, '').slice(0, 4))}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]{4}"
+              maxLength={4}
+              aria-label="Code PIN administrateur à quatre chiffres"
+              placeholder="••••"
             />
           </div>
         </label>
@@ -60,7 +64,7 @@ export function AdminDialog({ onSuccess, onClose }: AdminDialogProps) {
         <button
           className="button button--primary button--full"
           type="submit"
-          disabled={loading || token.length < 1}
+          disabled={loading || pin.length !== 4}
         >
           {loading ? 'Vérification…' : 'Déverrouiller'}
         </button>

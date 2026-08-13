@@ -32,6 +32,12 @@ if [[ ! -f "${ENVIRONMENT_FILE}" ]]; then
   exit 1
 fi
 
+# Les versions antérieures utilisaient un long jeton. La 0.1.2 impose le PIN demandé.
+sed -i -e '/^HOMEDASH_ADMIN_TOKEN=/d' -e '/^HOMEDASH_ADMIN_PIN=/d' "${ENVIRONMENT_FILE}"
+printf '\nHOMEDASH_ADMIN_PIN=0000\n' >> "${ENVIRONMENT_FILE}"
+chown root:homedash "${ENVIRONMENT_FILE}"
+chmod 0640 "${ENVIRONMENT_FILE}"
+
 repository="$(sed -n 's/^HOMEDASH_GITHUB_REPOSITORY=//p' "${ENVIRONMENT_FILE}" | tail -n 1)"
 if [[ ! "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   echo "HOMEDASH_GITHUB_REPOSITORY est absent ou invalide." >&2

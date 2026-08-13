@@ -9,7 +9,10 @@ const envSchema = z.object({
   HOMEDASH_DATABASE_PATH: z.string().default('./data/homedash.db'),
   HOMEDASH_PUBLIC_URL: z.string().url().default('http://localhost:5173'),
   HOMEDASH_TIMEZONE: z.string().default('Europe/Paris'),
-  HOMEDASH_ADMIN_TOKEN: z.string().min(12).default('development-admin-token'),
+  HOMEDASH_ADMIN_PIN: z
+    .string()
+    .regex(/^\d{4}$/)
+    .default('0000'),
   HOMEDASH_SENSOR_INGEST_TOKEN: z.string().min(12).default('development-sensor-token'),
   HOMEDASH_ENCRYPTION_KEY: z.string().optional(),
   HOMEDASH_GITHUB_REPOSITORY: z.string().default('orpheusbauer/HomeDash'),
@@ -36,14 +39,10 @@ function readVersion(): string {
       // The image can inject HOMEDASH_VERSION when VERSION is not beside the process.
     }
   }
-  return process.env.HOMEDASH_VERSION ?? '0.1.1';
+  return process.env.HOMEDASH_VERSION ?? '0.1.2';
 }
 
 export const config = {
   ...envSchema.parse(process.env),
   version: readVersion(),
 };
-
-if (config.NODE_ENV === 'production' && config.HOMEDASH_ADMIN_TOKEN === 'development-admin-token') {
-  throw new Error('HOMEDASH_ADMIN_TOKEN must be changed in production.');
-}

@@ -6,7 +6,7 @@ Le logiciel et le déploiement natif sont prêts à être testés. Les points su
 
 1. Pousser les changements ARMv6 sur `main`.
 2. Attendre la CI verte, y compris le smoke test de l’archive native.
-3. Créer le tag `v0.1.1` et vérifier les trois assets de release.
+3. Créer le tag `v0.1.2` et vérifier les trois assets de release.
 4. Installer Raspberry Pi OS Lite 32 bits et confirmer `armv6l`/`32`.
 5. Cloner avec une Deploy key en lecture seule.
 6. Installer la release native selon [installation-raspberry-pi.md](installation-raspberry-pi.md).
@@ -19,9 +19,9 @@ Critères : aucun crash, health check stable, reconnexion après coupure réseau
 
 ## Priorité 2 — tester une vraie mise à jour et son rollback
 
-- Publier une `v0.1.1` de test.
-- L’installer avec `sudo homedash-update-native v0.1.1`.
-- Vérifier la sauvegarde `pre-0.1.1-*` et le lien `current`.
+- Publier une `v0.1.2` de test.
+- L’installer avec `sudo homedash-update-native v0.1.2`.
+- Vérifier la sauvegarde `pre-0.1.2-*` et le lien `current`.
 - Publier volontairement une release de test qui échoue au health check sur une branche/tag dédié.
 - Confirmer le retour automatique au code et à la base précédents.
 - Tester une restauration complète sur une seconde carte microSD si possible.
@@ -69,7 +69,7 @@ Ajouter ensuite des tests Android instrumentés et une page diagnostic dédiée.
 - Tests accessibilité sur la vraie dalle.
 - Après stabilisation : humidité, qualité de l’air, historique court, Todo/courses et Home Assistant optionnel.
 
-## Définition de terminé pour 0.1.1 sur Zero
+## Définition de terminé pour 0.1.2 sur Zero
 
 - CI web/server, archive native et Android vertes ;
 - release native et SHA-256 disponibles ;

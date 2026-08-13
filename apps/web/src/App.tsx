@@ -20,7 +20,7 @@ import type {
   SystemMetrics,
   WidgetInstance,
 } from '@homedash/contracts';
-import { api, hasAdminToken, realtimeUrl } from './api';
+import { api, hasAdminSession, realtimeUrl } from './api';
 import { AdminDialog } from './components/AdminDialog';
 import { DashboardGrid } from './components/DashboardGrid';
 import { Modal } from './components/Modal';
@@ -55,7 +55,7 @@ export function App() {
     () => localStorage.getItem('homedash.activePage') ?? '',
   );
   const [editing, setEditing] = useState(false);
-  const [adminUnlocked, setAdminUnlocked] = useState(hasAdminToken());
+  const [adminUnlocked, setAdminUnlocked] = useState(hasAdminSession());
   const [showAdmin, setShowAdmin] = useState(false);
   const [adminPurpose, setAdminPurpose] = useState<'editing' | 'settings'>('editing');
   const [showCatalog, setShowCatalog] = useState(false);
@@ -123,6 +123,16 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  useEffect(() => {
+    const lockAdmin = () => {
+      setAdminUnlocked(false);
+      setEditing(false);
+      setToast('Session administrateur expirée');
+    };
+    window.addEventListener('homedash:admin-locked', lockAdmin);
+    return () => window.removeEventListener('homedash:admin-locked', lockAdmin);
+  }, []);
+
   const activePage = data?.pages.find((page) => page.id === activePageId) ?? data?.pages[0];
   const instances = useMemo(
     () => data?.instances.filter((instance) => instance.pageId === activePage?.id) ?? [],
@@ -130,11 +140,21 @@ export function App() {
   );
 
   function requestEditing() {
-    if (adminUnlocked || hasAdminToken()) {
+    if (adminUnlocked || hasAdminSession()) {
       setAdminUnlocked(true);
       setEditing(true);
     } else {
       setAdminPurpose('editing');
+      setShowAdmin(true);
+    }
+  }
+
+  function requestSettings() {
+    if (adminUnlocked || hasAdminSession()) {
+      setAdminUnlocked(true);
+      setShowSettings(true);
+    } else {
+      setAdminPurpose('settings');
       setShowAdmin(true);
     }
   }
@@ -325,11 +345,7 @@ export function App() {
               Modifier
             </button>
           )}
-          <button
-            className="icon-button"
-            onClick={() => setShowSettings(true)}
-            aria-label="Paramètres"
-          >
+          <button className="icon-button" onClick={requestSettings} aria-label="Paramètres">
             <Settings size={20} />
           </button>
         </div>

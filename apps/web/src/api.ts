@@ -1,6 +1,7 @@
 import type { ApiErrorPayload } from '@homedash/contracts';
 
-let adminToken = sessionStorage.getItem('homedash.adminToken') ?? '';
+sessionStorage.removeItem('homedash.adminToken');
+let adminSession = sessionStorage.getItem('homedash.adminSession') ?? '';
 
 export class ApiError extends Error {
   constructor(
@@ -14,14 +15,14 @@ export class ApiError extends Error {
   }
 }
 
-export function setAdminToken(token: string): void {
-  adminToken = token;
-  if (token) sessionStorage.setItem('homedash.adminToken', token);
-  else sessionStorage.removeItem('homedash.adminToken');
+export function setAdminSession(token: string): void {
+  adminSession = token;
+  if (token) sessionStorage.setItem('homedash.adminSession', token);
+  else sessionStorage.removeItem('homedash.adminSession');
 }
 
-export function hasAdminToken(): boolean {
-  return Boolean(adminToken);
+export function hasAdminSession(): boolean {
+  return Boolean(adminSession);
 }
 
 export async function api<T>(
@@ -34,11 +35,15 @@ export async function api<T>(
     headers: {
       Accept: 'application/json',
       ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(requiresAdmin && adminToken ? { 'X-HomeDash-Admin': adminToken } : {}),
+      ...(requiresAdmin && adminSession ? { 'X-HomeDash-Admin': adminSession } : {}),
       ...init.headers,
     },
   });
   if (!response.ok) {
+    if (requiresAdmin && response.status === 401) {
+      setAdminSession('');
+      window.dispatchEvent(new Event('homedash:admin-locked'));
+    }
     let payload: ApiErrorPayload | undefined;
     try {
       payload = (await response.json()) as ApiErrorPayload;
@@ -56,13 +61,16 @@ export async function api<T>(
   return (await response.json()) as T;
 }
 
-export async function verifyAdminToken(token: string): Promise<boolean> {
-  setAdminToken(token);
+export async function unlockAdmin(pin: string): Promise<boolean> {
   try {
-    await api<{ authenticated: boolean }>('/api/v1/admin/verify', {}, true);
+    const session = await api<{ token: string; expiresAt: string }>('/api/v1/admin/unlock', {
+      method: 'POST',
+      body: JSON.stringify({ pin }),
+    });
+    setAdminSession(session.token);
     return true;
   } catch {
-    setAdminToken('');
+    setAdminSession('');
     return false;
   }
 }

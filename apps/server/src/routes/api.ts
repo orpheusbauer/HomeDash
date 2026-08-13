@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import { ingestSensorSchema, saveLayoutSchema, updateNoteSchema } from '@homedash/contracts';
-import { requireAdmin, requireSensorToken } from '../auth.js';
+import { createAdminSession, requireAdmin, requireSensorToken } from '../auth.js';
 import { config } from '../config.js';
 import { tabletTelemetrySchema } from '@homedash/contracts';
 import { AppError } from '../errors.js';
@@ -195,6 +195,14 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     },
   );
 
+  app.post(
+    '/api/v1/admin/unlock',
+    { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } },
+    async (request) => {
+      const { pin } = z.object({ pin: z.string().regex(/^\d{4}$/) }).parse(request.body);
+      return createAdminSession(pin);
+    },
+  );
   app.get('/api/v1/admin/verify', { preHandler: requireAdmin }, async () => ({
     authenticated: true,
   }));

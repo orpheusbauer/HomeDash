@@ -22,7 +22,7 @@ Le web écoute sur 5173, l’API sur 4100. Vite proxyfie `/api`. La base de dév
 
 ## Variables
 
-- `HOMEDASH_ADMIN_TOKEN` : opérations administratives ; minimum 12 caractères.
+- `HOMEDASH_ADMIN_PIN` : PIN à quatre chiffres utilisé pour déverrouiller l’administration ; valeur demandée `0000`.
 - `HOMEDASH_SENSOR_INGEST_TOKEN` : capteurs HTTP, distinct.
 - `HOMEDASH_DATABASE_PATH` : fichier SQLite.
 - `HOMEDASH_TIMEZONE` : fuseau IANA.
@@ -83,8 +83,8 @@ Le build Android est aussi exécuté par GitHub Actions, car le poste actuel peu
 Après `npm run build`, Linux ou Git Bash peut reproduire l’asset de release :
 
 ```bash
-bash deployment/raspberry-pi-zero/package-native.sh 0.1.1 output
-sha256sum --check output/homedash-native-0.1.1.tar.gz.sha256
+bash deployment/raspberry-pi-zero/package-native.sh 0.1.2 output
+sha256sum --check output/homedash-native-0.1.2.tar.gz.sha256
 ```
 
 L’archive contient les trois dossiers `dist` et les manifests nécessaires à `npm ci --omit=dev`. Elle ne contient ni `node_modules`, ni secrets, ni données. Ne lancez pas la chaîne de build sur le Zero ARMv6.

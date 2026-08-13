@@ -12,7 +12,7 @@ Le code peut être retéléchargé depuis GitHub. Les éléments irremplaçables
 /etc/homedash/github-token
 ```
 
-`/var/lib/homedash/tls/root-ca.key` permet de signer des certificats reconnus par la tablette : traitez-la comme un secret. L’archive contient aussi les tokens administrateur, capteurs, Google et GitHub.
+`/var/lib/homedash/tls/root-ca.key` permet de signer des certificats reconnus par la tablette : traitez-la comme un secret. L’archive contient aussi le PIN administrateur et les tokens capteurs, Google et GitHub.
 
 Le clone `/opt/homedash/repository` et les releases sous `/opt/homedash/releases` sont reproductibles et ne sont pas indispensables dans la sauvegarde de données.
 
@@ -165,7 +165,7 @@ Si la même CA et le même nom/IP ont été restaurés, la tablette conserve sa 
 
 Considérez comme compromis :
 
-- le token administrateur ;
+- le code PIN administrateur ;
 - le token d’ingestion capteur ;
 - le token GitHub ;
 - les identifiants Google OAuth ;

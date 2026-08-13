@@ -90,7 +90,7 @@ Les mises à jour arrêtent le processus avant la sauvegarde afin de produire un
 ## Releases atomiques
 
 ```text
-/opt/homedash/releases/0.1.1
+/opt/homedash/releases/0.1.2
 /opt/homedash/releases/0.2.0
 /opt/homedash/current -> /opt/homedash/releases/0.2.0
 ```
@@ -127,6 +127,8 @@ Une augmentation importante du nombre de clients, widgets temps réel ou intégr
 - Réservez l’adresse du Pi dans le routeur.
 - Utilisez SSH par clé et une Deploy key GitHub en lecture seule.
 - Le PAT Releases est limité à `Contents: Read-only` et au seul dépôt.
+- Le PIN `0000` n’est envoyé qu’au déverrouillage HTTPS. Il crée une session aléatoire de huit heures conservée dans l’onglet, et l’API limite le déverrouillage à cinq tentatives par minute.
+- Un PIN aussi simple protège surtout contre une manipulation accidentelle. HomeDash doit rester strictement sur le LAN et ne jamais être publié sur Internet.
 - Isolez idéalement les objets connectés dans un VLAN IoT.
 - Le port ESP32 en HTTP transmet un token en clair : autorisez-le seulement depuis ce VLAN ou migrez l’ESP32 vers HTTPS.
 - Sauvegardez `/etc/homedash` et `/var/lib/homedash/tls` chiffrés hors du Pi.

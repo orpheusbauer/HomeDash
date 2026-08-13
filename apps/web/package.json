@@ -1,6 +1,6 @@
 {
   "name": "@homedash/web",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
-    "@homedash/contracts": "0.1.1",
+    "@homedash/contracts": "0.1.2",
     "@tanstack/react-query": "latest",
     "date-fns": "latest",
     "gridstack": "latest",

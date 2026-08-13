@@ -68,7 +68,7 @@ Dans Paramètres, Google Calendar doit être indiqué comme configuré. Ajoutez 
 6. Supprimez-le.
 7. Vérifiez chaque opération dans Google Calendar web.
 
-Le cache de lecture dure cinq minutes. Une coupure Internet affiche les dernières données connues comme périmées. Les écritures exigent Internet et le token administrateur.
+Le cache de lecture dure cinq minutes. Une coupure Internet affiche les dernières données connues comme périmées. Les écritures exigent Internet et une session administrateur obtenue avec le PIN.
 
 ## 5. Problèmes courants
 

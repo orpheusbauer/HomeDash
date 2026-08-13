@@ -1,7 +1,10 @@
-import { timingSafeEqual } from 'node:crypto';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { config } from './config.js';
 import { AppError } from './errors.js';
+
+const ADMIN_SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const adminSessions = new Map<string, number>();
 
 function constantTimeEquals(left: string, right: string): boolean {
   const leftBuffer = Buffer.from(left);
@@ -9,13 +12,33 @@ function constantTimeEquals(left: string, right: string): boolean {
   return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
 }
 
+function pruneAdminSessions(now = Date.now()): void {
+  for (const [token, expiresAt] of adminSessions) {
+    if (expiresAt <= now) adminSessions.delete(token);
+  }
+}
+
+export function createAdminSession(pin: string): { token: string; expiresAt: string } {
+  if (!constantTimeEquals(pin, config.HOMEDASH_ADMIN_PIN)) {
+    throw new AppError(401, 'ADMIN_PIN_INVALID', 'Code PIN administrateur incorrect.');
+  }
+  const now = Date.now();
+  pruneAdminSessions(now);
+  const token = randomBytes(32).toString('hex');
+  const expiresAt = now + ADMIN_SESSION_TTL_MS;
+  adminSessions.set(token, expiresAt);
+  return { token, expiresAt: new Date(expiresAt).toISOString() };
+}
+
 export async function requireAdmin(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   const token = request.headers['x-homedash-admin'];
-  if (typeof token !== 'string' || !constantTimeEquals(token, config.HOMEDASH_ADMIN_TOKEN)) {
+  const now = Date.now();
+  pruneAdminSessions(now);
+  if (typeof token !== 'string' || (adminSessions.get(token) ?? 0) <= now) {
     throw new AppError(
       401,
       'ADMIN_AUTH_REQUIRED',
-      'Une authentification administrateur est requise.',
+      'Une session administrateur valide est requise.',
     );
   }
 }

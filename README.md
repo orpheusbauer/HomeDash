@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.1.1` fournit déjà :
+La version `0.1.2` fournit déjà :
 
 - une grille tactile responsive avec déplacement, redimensionnement, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -29,7 +29,7 @@ npm install
 npm run dev
 ```
 
-Ouvrez `http://localhost:5173`. En développement, le jeton administrateur par défaut est `development-admin-token`. Ne l’utilisez jamais en production.
+Ouvrez `http://localhost:5173`. Le code PIN administrateur demandé est `0000`. Après sa validation, le serveur crée une session administrateur aléatoire et temporaire pour l’onglet courant.
 
 Contrôles complets :
 

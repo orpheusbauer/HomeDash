@@ -7,17 +7,25 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const directory = mkdtempSync(join(tmpdir(), 'homedash-api-'));
 process.env.NODE_ENV = 'test';
 process.env.HOMEDASH_DATABASE_PATH = join(directory, 'api.db');
-process.env.HOMEDASH_ADMIN_TOKEN = 'test-admin-token-123';
+process.env.HOMEDASH_ADMIN_PIN = '0000';
 process.env.HOMEDASH_SENSOR_INGEST_TOKEN = 'test-sensor-token-123';
 
 let app: FastifyInstance;
 let closeDatabase: () => void;
+let adminHeaders: { 'x-homedash-admin': string };
 
 beforeAll(async () => {
   ({ closeDatabase } = await import('../db/index.js'));
   const module = await import('../app.js');
   app = await module.createApp();
   await app.ready();
+  const unlock = await app.inject({
+    method: 'POST',
+    url: '/api/v1/admin/unlock',
+    payload: { pin: '0000' },
+  });
+  expect(unlock.statusCode).toBe(200);
+  adminHeaders = { 'x-homedash-admin': unlock.json<{ token: string }>().token };
 });
 
 afterAll(async () => {
@@ -44,11 +52,28 @@ describe('API HomeDash', () => {
     const accepted = await app.inject({
       method: 'POST',
       url: '/api/v1/pages',
-      headers: { 'x-homedash-admin': 'test-admin-token-123' },
+      headers: adminHeaders,
       payload: { name: 'Maison' },
     });
     expect(accepted.statusCode).toBe(201);
     expect(accepted.json<{ name: string }>().name).toBe('Maison');
+  });
+
+  it('déverrouille l’administration uniquement avec le PIN 0000', async () => {
+    const denied = await app.inject({
+      method: 'POST',
+      url: '/api/v1/admin/unlock',
+      payload: { pin: '1234' },
+    });
+    expect(denied.statusCode).toBe(401);
+    expect(denied.json<{ error: { code: string } }>().error.code).toBe('ADMIN_PIN_INVALID');
+
+    const verified = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/verify',
+      headers: adminHeaders,
+    });
+    expect(verified.statusCode).toBe(200);
   });
 
   it('sépare le jeton d’ingestion capteur', async () => {
@@ -74,7 +99,6 @@ describe('API HomeDash', () => {
   });
 
   it('associe, authentifie puis révoque une tablette', async () => {
-    const adminHeaders = { 'x-homedash-admin': 'test-admin-token-123' };
     const pairing = await app.inject({
       method: 'POST',
       url: '/api/v1/devices/pairing',

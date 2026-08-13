@@ -2,6 +2,8 @@
 
 HomeDash n’utilise pas Docker sur le Raspberry Pi Zero original. Une GitHub Release contient une archive JavaScript déjà compilée. Le Pi installe chaque version dans un dossier séparé et `/opt/homedash/current` désigne la version active.
 
+À partir de `v0.1.2`, l’updater supprime automatiquement l’ancien long jeton administrateur et configure `HOMEDASH_ADMIN_PIN=0000` avant le redémarrage. Les autres secrets restent inchangés.
+
 ## 1. Contenu d’une release
 
 Un tag `vX.Y.Z` lance `.github/workflows/release.yml`. GitHub Actions :
