@@ -114,7 +114,7 @@ export function seedDatabase(): void {
         y: 0,
         w: 4,
         h: 4,
-        config: { location: 'Strasbourg', latitude: 48.5734, longitude: 7.7521 },
+        config: { location: 'Paris', latitude: 48.8566, longitude: 2.3522 },
       },
       { widgetId: 'system', x: 7, y: 0, w: 5, h: 4, config: {} },
       { widgetId: 'notes', x: 0, y: 4, w: 4, h: 4, config: { noteId } },
@@ -124,7 +124,7 @@ export function seedDatabase(): void {
         y: 4,
         w: 8,
         h: 4,
-        config: { location: 'Strasbourg', latitude: 48.5734, longitude: 7.7521 },
+        config: { location: 'Paris', latitude: 48.8566, longitude: 2.3522 },
       },
     ];
     widgets.forEach((widget) =>

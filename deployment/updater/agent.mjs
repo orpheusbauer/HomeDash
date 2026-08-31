@@ -25,7 +25,7 @@ const socketPath = resolve(
   process.env.HOMEDASH_UPDATER_SOCKET || '/run/homedash-updater/updater.sock',
 );
 const tokenFile = resolve(process.env.HOMEDASH_UPDATER_TOKEN_FILE || '/etc/homedash/updater-token');
-const allowedImage = process.env.HOMEDASH_ALLOWED_IMAGE || 'ghcr.io/orpheusbauer/homedash';
+const allowedImage = process.env.HOMEDASH_ALLOWED_IMAGE || 'ghcr.io/example/homedash';
 const statusFile = resolve(dataDirectory, 'update-status.json');
 
 let running = false;

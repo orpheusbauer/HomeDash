@@ -1,8 +1,8 @@
 # Tablette Android — installation murale de production
 
-Ce guide cible la qunyiCO Y10 sous Android 10. HomeDash `0.2.1` utilise le plein écran immersif Android : la barre d’état et la barre de navigation sont masquées pendant l’affichage, mais un glissement depuis le bord inférieur fait réapparaître temporairement Retour, Accueil et les applications récentes. L’application ne devient ni lanceur Android, ni mode kiosque verrouillé ; le bouton **Android** reste visible dans la barre supérieure.
+Ce guide cible une tablette sous Android 10 ou ultérieur. HomeDash `0.3.0` utilise le plein écran immersif Android : la barre d’état et la barre de navigation sont masquées pendant l’affichage, mais un glissement depuis le bord inférieur fait réapparaître temporairement Retour, Accueil et les applications récentes. L’application ne devient ni lanceur Android, ni mode kiosque verrouillé ; le bouton **Android** reste visible dans la barre supérieure.
 
-HomeDash conserve en parallèle les fonctions murales utiles : icône dédiée, ouverture automatique après redémarrage, écran maintenu actif pendant l’affichage, reconnexion au Pi et détection locale de présence. La caméra s’arrête lorsque vous quittez l’application. L’extinction réelle après absence est une option distincte, désactivée par défaut et expliquée à la section 8.
+HomeDash conserve en parallèle les fonctions murales utiles : icône dédiée, ouverture automatique après redémarrage, reconnexion au Pi et détection locale de présence. Le délai de veille et le verrouillage configurés dans Android restent applicables pendant l’affichage. La caméra s’arrête lorsque l’écran s’éteint ou que vous quittez l’application. Le verrouillage anticipé après absence est une option distincte, désactivée par défaut et expliquée à la section 8.
 
 ## Repères : sur quel appareil exécuter chaque action ?
 
@@ -13,7 +13,7 @@ Dans ce guide, chaque bloc indique explicitement l’appareil concerné :
 - **[TABLETTE — Android]** : menus Android, Chrome et application HomeDash ;
 - **[GITHUB — navigateur]** : site github.com ouvert depuis le PC ou la tablette.
 
-En production, vous ne lancez ni Vite, ni Node, ni un fichier du dépôt sur le PC. Le serveur tourne sur le Pi sous `systemd`. Le PC et la tablette ouvrent tous les deux l’adresse fournie par le Pi : `https://192.168.1.124`.
+En production, vous ne lancez ni Vite, ni Node, ni un fichier du dépôt sur le PC. Le serveur tourne sur le Pi sous `systemd`. Le PC et la tablette ouvrent tous les deux l’adresse `https://homedash.local` (ou l’adresse IP réservée à votre Pi).
 
 ## 1. Préparer une signature Android durable — une seule fois
 
@@ -67,15 +67,15 @@ Le workflow Release s’arrête volontairement si un secret manque. Il publie en
 Depuis le PC, après une CI verte :
 
 ```powershell
-git tag -a v0.2.1 -m "HomeDash 0.2.1 - correction Raspberry Pi"
-git push origin v0.2.1
+git tag -a v0.3.0 -m "HomeDash 0.3.0 - météo horaire et mises à jour Android"
+git push origin v0.3.0
 ```
 
-Dans GitHub, ouvrez **Actions > Release** et attendez le vert. Dans **Releases > v0.2.1**, vérifiez la présence de :
+Dans GitHub, ouvrez **Actions > Release** et attendez le vert. Dans **Releases > v0.3.0**, vérifiez la présence de :
 
 ```text
-homedash-kiosk-0.2.1.apk
-homedash-kiosk-0.2.1.apk.sha256
+homedash-kiosk-0.3.0.apk
+homedash-kiosk-0.3.0.apk.sha256
 ```
 
 L’artifact `homedash-kiosk-debug` du workflow CI reste destiné au développement. Ne l’installez pas sur la tablette murale finale.
@@ -98,11 +98,13 @@ Ce n’est donc pas un problème d’APK. Nginx est lancé, mais le service Node
 **[PC — PowerShell]** Ouvrez une nouvelle fenêtre PowerShell :
 
 ```powershell
-Test-NetConnection 192.168.1.124 -Port 22
-ssh <UTILISATEUR_DU_PI>@192.168.1.124
+$PiHost = "homedash.local"
+$PiUser = "VOTRE_UTILISATEUR_DU_PI"
+Test-NetConnection $PiHost -Port 22
+ssh "$PiUser@$PiHost"
 ```
 
-Remplacez `<UTILISATEUR_DU_PI>` par le nom créé dans Raspberry Pi Imager, par exemple `orpheus`. `TcpTestSucceeded` doit valoir `True`. Après `ssh`, l’invite ne commence plus par `PS C:\` : les commandes suivantes sont exécutées sur le Pi.
+Remplacez uniquement la valeur de `$PiUser` par le nom créé dans Raspberry Pi Imager. Si `homedash.local` n’est pas résolu sur votre réseau, remplacez `$PiHost` par l’IP réservée au Pi. `TcpTestSucceeded` doit valoir `True`. Après `ssh`, l’invite ne commence plus par `PS C:\` : les commandes suivantes sont exécutées sur le Pi.
 
 ### 3.2 Diagnostiquer le `502` sans rien supprimer
 
@@ -129,13 +131,13 @@ Pour un Pi Zero original, les résultats matériels attendus sont `armv6l` et `3
 
 - `nginx` : `active (running)` ;
 - `homedash` : `active (running)` ;
-- `/opt/homedash/current` pointe vers `/opt/homedash/releases/0.2.1` ;
+- `/opt/homedash/current` pointe vers `/opt/homedash/releases/0.3.0` ;
 - le code serveur et la configuration sont présents ;
 - Node écoute sur `127.0.0.1:4100`.
 
 Si HomeDash est déjà `active (running)`, passez directement à la section 3.4. Sinon, poursuivez avec la réparation ci-dessous.
 
-### 3.3 Installer ou réparer HomeDash 0.2.1 sur le Pi
+### 3.3 Installer ou réparer HomeDash 0.3.0 sur le Pi
 
 **[PI — terminal SSH]** Vérifiez d’abord que le clone existe :
 
@@ -159,13 +161,12 @@ Si le statut est vide, installez exactement la release publiée :
 ```bash
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.2.1
+git checkout v0.3.0
 
-sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
 ```
 
-Ce script est réexécutable sur une installation existante. Il vérifie l’architecture, installe le runtime Node ARMv6 si nécessaire, remet en place l’unité `systemd`, Nginx et le certificat, retire l’ancien agent Docker s’il subsiste, installe les protections de stockage, télécharge l’archive native `0.2.1`, puis lance un contrôle de santé. Sur un Zero, l’étape `npm ci` peut durer plusieurs minutes. Ne fermez pas SSH et ne coupez pas l’alimentation.
+Ce script est réexécutable sur une installation existante. Il vérifie l’architecture, installe le runtime Node ARMv6 si nécessaire, remet en place l’unité `systemd`, Nginx et le certificat, retire l’ancien agent Docker s’il subsiste, installe les protections de stockage, télécharge l’archive native `0.3.0`, puis lance un contrôle de santé. Sur un Zero, l’étape `npm ci` peut durer plusieurs minutes. Ne fermez pas SSH et ne coupez pas l’alimentation.
 
 Si le dépôt GitHub est privé, le fichier `/etc/homedash/github-token` doit déjà contenir le token en lecture seule décrit dans la section 7 de [installation-raspberry-pi.md](installation-raspberry-pi.md). Une erreur GitHub `404` pendant l’installation indique généralement que ce token manque, a expiré ou n’a pas `Contents: Read-only` sur ce dépôt.
 
@@ -183,10 +184,10 @@ readlink -f /opt/homedash/current
 curl --fail --show-error http://127.0.0.1:4100/health/ready
 curl --fail --show-error \
   --cacert /var/lib/homedash/tls/root-ca.crt \
-  https://192.168.1.124/health/ready
+  https://homedash.local/health/ready
 ```
 
-Les deux services doivent répondre `active`, la version doit être `0.2.1`, Node doit être `v22.23.1` avec l’architecture `arm`, et les deux commandes `curl` doivent retourner un JSON contenant :
+Les deux services doivent répondre `active`, la version doit être `0.3.0`, Node doit être `v22.23.1` avec l’architecture `arm`, et les deux commandes `curl` doivent retourner un JSON contenant :
 
 ```json
 { "status": "ready" }
@@ -231,7 +232,7 @@ exit
 **[PC — PowerShell]** Récupérez et installez uniquement ce certificat public :
 
 ```powershell
-scp <UTILISATEUR_DU_PI>@192.168.1.124:homedash-root-ca.crt .
+scp "${PiUser}@${PiHost}:homedash-root-ca.crt" .
 Import-Certificate `
   -FilePath .\homedash-root-ca.crt `
   -CertStoreLocation Cert:\CurrentUser\Root
@@ -240,10 +241,10 @@ Import-Certificate `
 N’importez jamais `root-ca.key`. Fermez puis rouvrez Chrome ou Edge et saisissez exactement :
 
 ```text
-https://192.168.1.124
+https://homedash.local
 ```
 
-Le dashboard doit s’afficher, sans `502` et sans alerte de certificat. Cliquez sur l’engrenage en haut à droite, saisissez le PIN `0000`, puis vérifiez que **Version installée** affiche `0.2.1`.
+Le dashboard doit s’afficher, sans `502` et sans alerte de certificat. Cliquez sur l’engrenage en haut à droite, saisissez le PIN `0000`, puis vérifiez que **Serveur Raspberry Pi** affiche `0.3.0`.
 
 À ce stade seulement, le serveur est prêt. Gardez cette page ouverte sur le PC : elle servira à créer le code d’association de la nouvelle APK.
 
@@ -261,7 +262,7 @@ Ne révoquez pas encore l’ancienne tablette depuis le PC : vous la supprimerez
 4. ouvrez **Paramètres > Applications > HomeDash > Désinstaller** ;
 5. redémarrez la tablette et vérifiez que l’écran d’accueil Android normal apparaît.
 
-Si **Désinstaller** reste grisé parce que l’ancienne installation est réellement **Device Owner**, sauvegardez les éléments personnels de la tablette puis effectuez une réinitialisation usine. La réinitialisation de la tablette ne touche pas la base HomeDash du Raspberry Pi. La version `0.2.1` ne réactive ni Device Owner, ni `lock task`.
+Si **Désinstaller** reste grisé parce que l’ancienne installation est réellement **Device Owner**, sauvegardez les éléments personnels de la tablette puis effectuez une réinitialisation usine. La réinitialisation de la tablette ne touche pas la base HomeDash du Raspberry Pi. La version `0.3.0` ne réactive ni Device Owner, ni `lock task`.
 
 ## 4. Installer l’APK sans relier la tablette au PC
 
@@ -271,14 +272,14 @@ Prérequis : la section 3.4 doit être entièrement verte et le dashboard doit �
 
 1. ouvrez Chrome ;
 2. connectez-vous à GitHub si le dépôt est privé ;
-3. ouvrez la Release `v0.2.1` ;
-4. téléchargez `homedash-kiosk-0.2.1.apk` ;
+3. ouvrez la Release `v0.3.0` ;
+4. téléchargez `homedash-kiosk-0.3.0.apk` ;
 5. si Android le demande, autorisez temporairement **Installer des applications inconnues** pour Chrome ou l’application Fichiers ;
 6. ouvrez le téléchargement et choisissez **Installer** ;
 7. après installation, retirez l’autorisation d’installation inconnue à Chrome ;
 8. ouvrez HomeDash depuis sa nouvelle icône verte.
 
-Cette procédure ne nécessite ni câble USB, ni ADB, ni Android Studio. Pour une mise à jour future, téléchargez la nouvelle APK signée et touchez **Mettre à jour** : données et association seront conservées.
+Cette procédure ne nécessite ni câble USB, ni ADB, ni Android Studio. Elle est la **dernière installation manuelle** nécessaire : l’APK `0.3.0` ajoute l’installateur intégré utilisé à la section 12.
 
 ## 5. Installer le certificat HTTPS du Pi
 
@@ -289,7 +290,7 @@ Si ce n’est pas déjà fait, transférez sur la tablette le même fichier publ
 1. **Paramètres > Sécurité > Chiffrement et identifiants** ;
 2. **Installer un certificat > Certificat d’autorité de certification** ;
 3. sélectionnez `homedash-root-ca.crt` ;
-4. testez `https://192.168.1.124` dans Chrome ;
+4. testez `https://homedash.local` dans Chrome ;
 5. poursuivez uniquement si aucune alerte TLS n’apparaît.
 
 N’installez jamais `root-ca.key` sur la tablette : cette clé privée doit rester sur le Pi et dans les sauvegardes chiffrées.
@@ -298,7 +299,7 @@ N’installez jamais `root-ca.key` sur la tablette : cette clé privée doit res
 
 Gardez le PC et la tablette devant vous pendant cette étape.
 
-1. **[TABLETTE]** Ouvrez l’icône HomeDash. Dans l’écran natif, saisissez `https://192.168.1.124`, choisissez **Paysage** ou **Portrait**, mais n’inventez pas de code.
+1. **[TABLETTE]** Ouvrez l’icône HomeDash. Dans l’écran natif, saisissez `https://homedash.local` (ou l’IP réservée au Pi), choisissez **Paysage** ou **Portrait**, mais n’inventez pas de code.
 2. **[PC]** Dans le dashboard ouvert à la section 3.5, cliquez sur l’engrenage, saisissez le PIN `0000`, puis descendez jusqu’à la section **Tablettes**.
 3. **[PC]** Cliquez sur **Associer une tablette**. Un code à six chiffres valable dix minutes apparaît.
 4. **[TABLETTE]** Recopiez immédiatement ce code, saisissez le nom `Tablette entrée`, puis touchez **Enregistrer et ouvrir HomeDash**.
@@ -323,14 +324,31 @@ Android tourne immédiatement l’activité. HomeDash applique automatiquement :
 - 12 colonnes en grand paysage ;
 - 6 colonnes en portrait de tablette ;
 - une seule colonne sur un écran très étroit ;
-- une barre supérieure sur deux rangées en portrait ;
+- une barre supérieure sur une seule rangée, avec l’onglet Accueil immédiatement à droite du logo ;
 - des cartes, marges, titres et onglets adaptés à la largeur disponible.
 
 La transformation responsive n’écrase pas la disposition 12 colonnes enregistrée tant que le mode édition n’est pas activé.
 
-## 8. Facultatif : éteindre l’écran après 90 secondes d’absence
+## 8. Configurer la veille et le verrouillage de l’écran
 
-Une application Android ordinaire ne peut pas éteindre réellement l’écran. HomeDash peut demander l’autorisation Android standard **Administrateur de l’appareil** afin d’appeler uniquement le verrouillage de l’écran après 90 secondes sans visage détecté.
+HomeDash `0.3.0` ne force plus l’écran à rester allumé. Le délai choisi dans Android s’applique donc normalement, même quand le dashboard est ouvert et que la tablette est branchée.
+
+**[TABLETTE — Android]** Pour obtenir une extinction après une minute suivie du verrouillage :
+
+1. ouvrez **Paramètres > Affichage > Veille** et choisissez **1 minute** ;
+2. ouvrez **Paramètres > Sécurité > Verrouillage de l’écran**, configurez votre PIN, schéma ou mot de passe, puis choisissez le verrouillage immédiat après la mise en veille si cette option existe ;
+3. si les **Options pour les développeurs** sont activées, désactivez **Rester activé / Écran toujours allumé pendant la charge** ;
+4. désactivez l’économiseur d’écran Android s’il affiche des photos ou une horloge au lieu d’éteindre la dalle ;
+5. rouvrez HomeDash et ne touchez plus l’écran pendant un peu plus d’une minute ;
+6. réveillez ensuite la tablette avec son bouton, un double toucher ou le geste prévu par son constructeur : Android doit afficher son écran de verrouillage.
+
+HomeDash ne réveille plus automatiquement la dalle lorsqu’un visage est détecté et ne s’affiche plus par-dessus l’écran verrouillé. La détection de présence reprend uniquement après votre déverrouillage et le retour dans l’application.
+
+Dans votre cas, aucune autorisation HomeDash supplémentaire n’est nécessaire : laissez l’option **Extinction après 90 secondes** désactivée et utilisez simplement le délai Android d’une minute.
+
+### Option facultative : verrouiller après 90 secondes d’absence
+
+Une application Android ordinaire ne peut pas éteindre directement la dalle. HomeDash peut demander l’autorisation Android standard **Administrateur de l’appareil** afin d’appeler uniquement le verrouillage après 90 secondes sans visage détecté. Cette option sert à verrouiller plus tôt qu’un délai Android plus long ; le délai Android reste toujours prioritaire.
 
 Cette option :
 
@@ -338,16 +356,19 @@ Cette option :
 - n’est pas le mode **Device Owner** ;
 - n’active ni `lock task`, ni remplacement du lanceur ;
 - ne modifie pas le plein écran immersif normal de HomeDash ; Retour et Accueil restent accessibles en glissant depuis le bord inférieur ;
-- ne fonctionne que lorsque HomeDash est ouvert ; la caméra et le service s’arrêtent dès que vous quittez l’application.
+- ne réveille pas automatiquement l’écran ;
+- ne fonctionne que lorsque HomeDash est ouvert ; la caméra et le service s’arrêtent dès que l’écran s’éteint ou que vous quittez l’application.
 
 Pour l’activer :
 
 1. ouvrez **Paramètres HomeDash > Affichage tablette > Adresse du serveur et association** ;
 2. touchez **Activer l’extinction après 90 secondes** ;
 3. lisez l’écran Android puis accordez l’autorisation à HomeDash ;
-4. revenez au dashboard et testez l’extinction puis le réveil par présence.
+4. pour isoler ce test, réglez temporairement la veille Android sur plus de deux minutes ;
+5. revenez au dashboard, quittez le champ de la caméra et vérifiez le verrouillage après environ 90 secondes ;
+6. réveillez et déverrouillez ensuite la tablette normalement.
 
-Si la tablette possède un verrouillage sécurisé, Android peut afficher l’écran de verrouillage après le réveil. HomeDash ne contourne pas cette sécurité. Dans ce cas, désactivez l’option si la saisie du code est gênante et utilisez plutôt un délai d’écran Android, une luminosité faible ou, ultérieurement, un capteur PIR/mmWave externe.
+Si la tablette possède un verrouillage sécurisé, Android affiche normalement l’écran de verrouillage au réveil. HomeDash ne contourne pas cette sécurité.
 
 Pour la désactiver, revenez au même écran et touchez **Désactiver l’extinction après 90 secondes**. HomeDash désactive alors la fonction et retire sa propre autorisation d’administration. Si la ROM ne la retire pas, faites-le dans **Paramètres Android > Sécurité > Applications d’administration de l’appareil**.
 
@@ -370,7 +391,7 @@ Pour changer l’URL ou refaire l’association, ouvrez **Paramètres > Affichag
 
 ## 10. Autoriser un démarrage fiable après reboot
 
-Le récepteur de boot est déjà inclus dans l’APK. Les ROMs de tablettes peuvent néanmoins bloquer les lancements automatiques. Dans les paramètres de la Y10 :
+Le récepteur de boot est déjà inclus dans l’APK. Les ROMs de tablettes peuvent néanmoins bloquer les lancements automatiques. Dans les paramètres de votre tablette :
 
 1. **Applications > HomeDash > Batterie > Sans restriction** ;
 2. activez **Démarrage automatique** si ce menu existe ;
@@ -396,18 +417,25 @@ Avant le montage définitif :
 
 Ne collez pas définitivement la tablette avant d’avoir validé le bouton **Android**, le redémarrage automatique et les deux orientations.
 
-## 12. Mise à jour future sans ordinateur branché à la tablette
+## 12. Mise à jour future directement depuis HomeDash
 
-Pour chaque nouvelle version :
+Après l’installation manuelle unique de `0.3.0`, ne retournez plus dans GitHub depuis la tablette et ne réinstallez plus le certificat. Pour chaque nouvelle version :
 
 1. développez et poussez depuis le PC ;
 2. attendez la CI verte ;
 3. créez un nouveau tag ;
 4. attendez la Release signée ;
-5. ouvrez cette Release depuis Chrome sur la tablette ;
-6. téléchargez la nouvelle APK ;
-7. touchez **Mettre à jour** ;
-8. ouvrez HomeDash et vérifiez la version dans Paramètres.
+5. mettez d’abord le serveur du Pi à jour avec `sudo homedash-update-native vX.Y.Z` ;
+6. sur la tablette, ouvrez **HomeDash > Paramètres**, puis saisissez le PIN administrateur ;
+7. dans **Mises à jour**, touchez **Vérifier** ;
+8. touchez **Installer l’application X.Y.Z** ;
+9. lors de la toute première utilisation seulement, Android ouvre **Autoriser depuis cette source** : activez HomeDash puis revenez à l’application ;
+10. confirmez **Mettre à jour** dans l’installateur Android ;
+11. rouvrez HomeDash et vérifiez **Application tablette** dans Paramètres.
+
+Le Raspberry Pi télécharge l’APK depuis la Release, refuse les fichiers de plus de 100 Mo, vérifie le SHA‑256 et ne conserve que la dernière APK en cache. La tablette doit déjà être associée : son jeton local protège le téléchargement. Android vérifie ensuite que l’identifiant d’application et la signature sont identiques à la version installée. L’adresse du serveur, l’orientation et l’association restent donc conservées.
+
+Android exige une confirmation visible pour une application distribuée hors Play Store ; HomeDash ne tente pas de contourner ce mécanisme. Si le bouton d’installation n’apparaît pas, vérifiez que le Pi et la tablette ont accès au réseau local, que la Release contient l’APK et son `.sha256`, et que l’application installée est au moins en version `0.3.0`.
 
 N’effacez jamais le keystore et ne changez pas les quatre secrets GitHub sans mettre leurs nouvelles valeurs en cohérence avec le même fichier de clé.
 
@@ -436,10 +464,12 @@ Validez chaque point :
 - **L’APK refuse la mise à jour** : l’ancienne APK n’a pas la même signature. Désinstallez-la une seule fois, puis installez la version signée.
 - **HomeDash ne démarre pas après reboot** : autorisez démarrage automatique et batterie sans restriction dans la ROM.
 - **Écran blanc** : testez l’URL dans Chrome et mettez Android System WebView/Chrome à jour.
-- **Erreur de certificat** : réinstallez `root-ca.crt`, vérifiez l’heure et utilisez exactement `https://192.168.1.124`.
-- **Orientation inchangée** : vérifiez que vous utilisez bien l’APK `0.2.1`, pas le site dans Chrome.
+- **Erreur de certificat** : réinstallez `root-ca.crt`, vérifiez l’heure et utilisez exactement l’adresse couverte par le certificat, normalement `https://homedash.local`.
+- **Orientation inchangée** : vérifiez que vous utilisez bien l’APK `0.3.0` ou ultérieure, pas le site dans Chrome.
+- **Bouton de mise à jour tablette absent** : l’APK installée est antérieure à `0.3.0`, la tablette n’est plus associée, ou la Release ne contient pas l’APK et son SHA‑256.
 - **Barres Android impossibles à afficher** : commencez le geste exactement sur le bord inférieur et glissez vers le centre ; le bouton **Android** du dashboard reste la sortie de secours permanente.
 - **Caméra inactive après retour** : rouvrez HomeDash et contrôlez la permission caméra dans les paramètres Android.
-- **L’écran ne s’éteint pas après absence** : activez l’option native, vérifiez l’autorisation Administrateur de l’appareil et testez la caméra en lumière réelle.
+- **L’écran ne s’éteint jamais** : vérifiez que l’APK `0.3.0` ou ultérieure est installée, contrôlez **Affichage > Veille**, désactivez **Rester activé pendant la charge** dans les Options pour les développeurs et désactivez l’économiseur d’écran.
+- **Le verrouillage facultatif après 90 secondes ne fonctionne pas** : vérifiez l’autorisation Administrateur de l’appareil et testez la caméra en lumière réelle.
 - **Un code Android apparaît au réveil** : c’est le verrouillage système normal. Désactivez l’extinction automatique si ce comportement ne vous convient pas.
 - **Besoin de modifier le serveur** : Paramètres HomeDash > Affichage tablette > Adresse du serveur et association.

@@ -32,6 +32,7 @@ oauth-token*.json
 
 # Android and IDE
 .gradle/
+.kotlin/
 local.properties
 *.apk
 *.aab

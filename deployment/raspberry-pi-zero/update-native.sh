@@ -45,9 +45,16 @@ if [[ ! -f "${ENVIRONMENT_FILE}" ]]; then
   exit 1
 fi
 
-# Les versions antérieures utilisaient un long jeton. La 0.1.2 impose le PIN demandé.
-sed -i -e '/^HOMEDASH_ADMIN_TOKEN=/d' -e '/^HOMEDASH_ADMIN_PIN=/d' "${ENVIRONMENT_FILE}"
-printf '\nHOMEDASH_ADMIN_PIN=0000\n' >> "${ENVIRONMENT_FILE}"
+# Les versions antérieures utilisaient un long jeton. La 0.1.2 impose le PIN
+# demandé et la 0.3.0 ajoute un cache APK persistant et borné.
+sed -i \
+  -e '/^HOMEDASH_ADMIN_TOKEN=/d' \
+  -e '/^HOMEDASH_ADMIN_PIN=/d' \
+  -e '/^HOMEDASH_ANDROID_UPDATE_CACHE=/d' \
+  "${ENVIRONMENT_FILE}"
+printf '\nHOMEDASH_ADMIN_PIN=0000\nHOMEDASH_ANDROID_UPDATE_CACHE=/var/lib/homedash/data/android-updates\n' \
+  >> "${ENVIRONMENT_FILE}"
+install -d -o homedash -g homedash -m 0750 /var/lib/homedash/data/android-updates
 chown root:homedash "${ENVIRONMENT_FILE}"
 chmod 0640 "${ENVIRONMENT_FILE}"
 

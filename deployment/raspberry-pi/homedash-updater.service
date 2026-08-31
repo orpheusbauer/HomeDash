@@ -15,7 +15,7 @@ Environment=HOMEDASH_ROOT=/opt/homedash
 Environment=HOMEDASH_DATA_DIR=/var/lib/homedash/data
 Environment=HOMEDASH_UPDATER_SOCKET=/run/homedash-updater/updater.sock
 Environment=HOMEDASH_UPDATER_TOKEN_FILE=/etc/homedash/updater-token
-Environment=HOMEDASH_ALLOWED_IMAGE=ghcr.io/orpheusbauer/homedash
+Environment=HOMEDASH_ALLOWED_IMAGE=ghcr.io/example/homedash
 ExecStart=/usr/bin/node /opt/homedash/deployment/updater/agent.mjs
 Restart=on-failure
 RestartSec=15

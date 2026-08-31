@@ -1,6 +1,6 @@
 # Projet : HomeDash - Dashboard domestique modulaire sur tablette Android
 
-Je souhaite que tu m'accompagnes dans la conception et le développement d'un projet personnel complet appelé provisoirement **HomeDash**.
+Ce document décrit la conception et le développement du projet libre et auto-hébergeable **HomeDash**.
 
 Avant de commencer à coder massivement, analyse ce cahier des charges, inspecte l'environnement et le repository existant s'il y en a un, puis propose une architecture technique cohérente.
 
@@ -12,17 +12,16 @@ L'objectif est de construire d'abord un **MVP fonctionnel et propre**, tout en c
 
 # 1. OBJECTIF GÉNÉRAL
 
-Je veux créer un dashboard domestique affiché en permanence sur une tablette tactile fixée au mur dans l'entrée de ma maison.
+HomeDash fournit un dashboard domestique affichable en permanence sur une tablette tactile, par exemple fixée au mur dans l'entrée d'un logement.
 
-Matériel actuel :
+Matériel compatible visé :
 
-* tablette : qunyiCO Y10 ;
-* Android 10 ;
+* tablette Android 10 ou version ultérieure ;
 * tablette fixée au mur ;
 * tablette alimentée en permanence ;
 * tablette entièrement dédiée au dashboard ;
-* Raspberry Pi disponible dans la maison et pouvant fonctionner 24 h/24 ;
-* ordinateur personnel utilisé pour le développement ;
+* Raspberry Pi disponible sur le réseau local et pouvant fonctionner 24 h/24 ;
+* ordinateur utilisé pour le développement ;
 * Git/GitHub pour versionner et distribuer les nouvelles versions.
 
 Le dashboard doit afficher différentes informations domestiques sous forme de **widgets/modules indépendants**.
@@ -40,7 +39,7 @@ Exemples :
 * informations système ;
 * futurs capteurs domotiques.
 
-Le système est destiné uniquement à mon domicile. Il n'est pas nécessaire de concevoir une infrastructure SaaS, multi-tenant ou destinée à des milliers d'utilisateurs.
+Le système est destiné à être auto-hébergé par un foyer. Il n'est pas nécessaire de concevoir une infrastructure SaaS, multi-tenant ou destinée à des milliers d'utilisateurs.
 
 Je privilégie :
 
@@ -343,7 +342,7 @@ Créer une intégration Google Calendar propre utilisant OAuth 2.0.
 
 Fonctions souhaitées :
 
-* authentification avec mon compte Google ;
+* authentification avec le compte Google de l'utilisateur ;
 * affichage des calendriers autorisés ;
 * événements du jour ;
 * événements à venir ;
@@ -655,7 +654,7 @@ L'installation doit idéalement :
 * images/version précédente ;
 * mécanisme de rollback.
 
-Choisir la solution la plus simple et fiable pour un Raspberry Pi personnel.
+Choisir la solution la plus simple et fiable pour un Raspberry Pi auto-hébergé.
 
 Le système de mise à jour lui-même doit être conçu avec prudence afin qu'une mise à jour défectueuse ne rende pas le dashboard inutilisable.
 

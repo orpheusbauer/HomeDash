@@ -92,20 +92,10 @@ class PresenceService : LifecycleService() {
                 if (present) {
                     lastPresenceAt = SystemClock.elapsedRealtime()
                     lockedForAbsence = false
-                    wakeScreen()
                 }
             }
             .addOnFailureListener { present = false }
             .addOnCompleteListener { analyzing.set(false); image.close() }
-    }
-
-    @Suppress("DEPRECATION")
-    private fun wakeScreen() {
-        val power = getSystemService(PowerManager::class.java)
-        if (!power.isInteractive) {
-            power.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, "HomeDash:presence").apply { acquire(10_000) }
-            startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
-        }
     }
 
     private fun lockIfAbsent() {

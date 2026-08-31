@@ -14,9 +14,12 @@ import {
 import type { TabletDevice } from '@homedash/contracts';
 import {
   getDashboardOrientation,
+  getAndroidAppVersion,
   hasAndroidBridge,
+  installAndroidUpdate,
   openAndroidAppSettings,
   setDashboardOrientation,
+  supportsAndroidUpdates,
   type DashboardOrientation,
 } from '../android-bridge';
 import { api } from '../api';
@@ -28,10 +31,24 @@ type UpdateInfo = {
   updateAvailable: boolean;
   installable: boolean;
   manifest: Record<string, unknown> | null;
+  android: { version: string | null; downloadAvailable: boolean };
 };
 type CalendarStatus = { configured: boolean; connected: boolean; message: string };
 
 const formatBytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
+
+function versionParts(value: string): [number, number, number] {
+  const match = value.match(/^(\d+)\.(\d+)\.(\d+)/);
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : [0, 0, 0];
+}
+
+function isNewerVersion(candidate: string, current: string): boolean {
+  const left = versionParts(candidate);
+  const right = versionParts(current);
+  return left.some(
+    (part, index) => part > right[index]! && left.slice(0, index).every((v, i) => v === right[i]),
+  );
+}
 
 export function SettingsCenter({
   authenticated,
@@ -42,7 +59,10 @@ export function SettingsCenter({
 }) {
   const client = useQueryClient();
   const isAndroidApp = hasAndroidBridge();
+  const androidAppVersion = isAndroidApp ? getAndroidAppVersion() : null;
+  const androidUpdaterSupported = isAndroidApp && supportsAndroidUpdates();
   const [orientation, setOrientation] = useState<DashboardOrientation | null>(null);
+  const [androidUpdateStarted, setAndroidUpdateStarted] = useState(false);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const updates = useQuery({
     queryKey: ['admin', 'updates'],
@@ -91,6 +111,21 @@ export function SettingsCenter({
   function changeOrientation(value: DashboardOrientation) {
     setOrientation(value);
     setDashboardOrientation(value);
+  }
+
+  const androidReleaseVersion = updates.data?.android.version ?? null;
+  const androidUpdateAvailable = Boolean(
+    androidReleaseVersion &&
+    updates.data?.android.downloadAvailable &&
+    (androidAppVersion
+      ? isNewerVersion(androidReleaseVersion, androidAppVersion)
+      : !androidUpdaterSupported),
+  );
+
+  function startAndroidUpdate() {
+    if (!androidReleaseVersion) return;
+    setAndroidUpdateStarted(true);
+    installAndroidUpdate(androidReleaseVersion);
   }
 
   if (!authenticated)
@@ -154,7 +189,7 @@ export function SettingsCenter({
           <Download size={20} />
           <div>
             <h3>Mises à jour</h3>
-            <p>Image vérifiée, sauvegarde puis rollback automatique.</p>
+            <p>Versions du serveur Raspberry Pi et de l’application tablette.</p>
           </div>
         </div>
         {updates.isLoading && <p className="form-hint">Recherche d’une version…</p>}
@@ -166,7 +201,7 @@ export function SettingsCenter({
         {updates.data && (
           <div className="settings-list">
             <div>
-              <span>Version installée</span>
+              <span>Serveur Raspberry Pi</span>
               <strong>{updates.data.installedVersion}</strong>
             </div>
             <div>
@@ -177,6 +212,12 @@ export function SettingsCenter({
               <span>État</span>
               <strong>{updates.data.updateAvailable ? 'Mise à jour disponible' : 'À jour'}</strong>
             </div>
+            {isAndroidApp && (
+              <div>
+                <span>Application tablette</span>
+                <strong>{androidAppVersion ?? 'Ancienne version'}</strong>
+              </div>
+            )}
           </div>
         )}
         <div className="button-row">
@@ -196,11 +237,35 @@ export function SettingsCenter({
         </div>
         {updates.data?.updateAvailable && !updates.data.installable && (
           <p className="form-hint">
-            La release existe, mais l’agent de mise à jour du Raspberry Pi n’est pas joignable.
+            Le Raspberry Pi Zero se met à jour par la commande SSH sécurisée décrite dans le guide
+            de mise à jour.
           </p>
         )}
         {install.isSuccess && (
           <p className="text-success">Mise à jour acceptée. HomeDash va redémarrer.</p>
+        )}
+        {isAndroidApp && androidUpdateAvailable && androidUpdaterSupported && (
+          <button
+            className="button button--primary"
+            disabled={androidUpdateStarted}
+            onClick={startAndroidUpdate}
+          >
+            <Download size={17} />
+            Installer l’application {androidReleaseVersion}
+          </button>
+        )}
+        {isAndroidApp && androidUpdateAvailable && !androidUpdaterSupported && (
+          <p className="form-hint">
+            Cette ancienne APK ne contient pas encore l’installateur intégré. Installez manuellement
+            la version {androidReleaseVersion} une dernière fois ; les versions suivantes se
+            mettront à jour depuis ce bouton sans effacer la configuration.
+          </p>
+        )}
+        {isAndroidApp && androidUpdateStarted && (
+          <p className="text-success">
+            Suivez les écrans Android : autorisez cette source si demandé, puis confirmez
+            l’installation. HomeDash conserve son adresse et son association.
+          </p>
         )}
       </section>
       <section className="settings-section">

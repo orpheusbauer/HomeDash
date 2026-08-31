@@ -62,7 +62,7 @@ L’exemple [esp32-temperature.ino](../examples/esp32-temperature/esp32-temperat
 8. Vérifiez un code HTTP `202` toutes les 60 secondes.
 9. Changez les secrets copiés dans le sketch si celui-ci a été partagé par erreur.
 
-Le firmware d’exemple utilise HTTP sur `192.168.1.124:4100` car la gestion d’une CA privée sur microcontrôleur demande d’embarquer le certificat. Nginx n’expose sur ce port que `POST /api/v1/sensors/ingest` et refuse les autres routes. Le token circule néanmoins en clair : pour un réseau IoT non fiable, ajoutez la CA HomeDash à `WiFiClientSecure` ou placez les objets dans un VLAN isolé qui ne peut atteindre que ce port du Pi.
+Le firmware d’exemple utilise HTTP sur `IP_DU_PI:4100` car la gestion d’une CA privée sur microcontrôleur demande d’embarquer le certificat. Remplacez `IP_DU_PI` avant compilation. Nginx n’expose sur ce port que `POST /api/v1/sensors/ingest` et refuse les autres routes. Le token circule néanmoins en clair : pour un réseau IoT non fiable, ajoutez la CA HomeDash à `WiFiClientSecure` ou placez les objets dans un VLAN isolé qui ne peut atteindre que ce port du Pi.
 
 ## États et valeurs obsolètes
 

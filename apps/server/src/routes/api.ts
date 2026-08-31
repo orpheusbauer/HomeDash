@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createReadStream } from 'node:fs';
 import type { FastifyInstance } from 'fastify';
 import { ingestSensorSchema, saveLayoutSchema, updateNoteSchema } from '@homedash/contracts';
 import { createAdminSession, requireAdmin, requireSensorToken } from '../auth.js';
@@ -34,7 +35,12 @@ import {
 import { readNetworkMetrics, readSystemMetrics } from '../services/system.js';
 import { getWeather } from '../services/weather.js';
 import { createBackup, listBackups } from '../services/backup.js';
-import { checkForUpdates, installUpdate, updaterRequest } from '../services/updates.js';
+import {
+  checkForUpdates,
+  installUpdate,
+  prepareAndroidApk,
+  updaterRequest,
+} from '../services/updates.js';
 import {
   authenticateTablet,
   createPairingCode,
@@ -45,6 +51,7 @@ import {
 } from '../services/devices.js';
 
 const idParams = z.object({ id: z.string().uuid() });
+const androidUpdateParams = idParams.extend({ version: z.string().regex(/^\d+\.\d+\.\d+$/) });
 const pageBody = z.object({ name: z.string().trim().min(1).max(60) });
 const widgetBody = z.object({
   widgetId: z.string().min(1),
@@ -221,6 +228,19 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     authenticateTablet(id, token);
     saveTabletTelemetry(id, tabletTelemetrySchema.parse(request.body));
     return reply.code(204).send();
+  });
+  app.get('/api/v1/devices/:id/updates/android/:version/apk', async (request, reply) => {
+    const { id, version } = androidUpdateParams.parse(request.params);
+    const token = String(request.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+    authenticateTablet(id, token);
+    const apk = await prepareAndroidApk(version);
+    reply
+      .header('Content-Type', 'application/vnd.android.package-archive')
+      .header('Content-Length', String(apk.size))
+      .header('Content-Disposition', `attachment; filename="${apk.fileName}"`)
+      .header('X-HomeDash-SHA256', apk.digest)
+      .header('Cache-Control', 'private, no-store');
+    return reply.send(createReadStream(apk.path));
   });
   app.get('/api/v1/devices', { preHandler: requireAdmin }, async () => listTablets());
   app.delete('/api/v1/devices/:id', { preHandler: requireAdmin }, async (request, reply) => {

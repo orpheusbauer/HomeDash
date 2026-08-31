@@ -6,7 +6,7 @@ import { NetworkWidget } from './NetworkWidget';
 import { NotesWidget } from './NotesWidget';
 import { SensorWidget } from './SensorWidget';
 import { SystemWidget } from './SystemWidget';
-import { CurrentWeatherWidget, ForecastWeatherWidget } from './WeatherWidget';
+import { CurrentWeatherWidget, ForecastWeatherWidget, HourlyWeatherWidget } from './WeatherWidget';
 
 const registry: Record<string, ComponentType<WidgetComponentProps>> = {
   clock: ClockWidget,
@@ -14,6 +14,7 @@ const registry: Record<string, ComponentType<WidgetComponentProps>> = {
   system: SystemWidget,
   'weather.current': CurrentWeatherWidget,
   'weather.forecast': ForecastWeatherWidget,
+  'weather.hourly': HourlyWeatherWidget,
   'sensor.temperature': SensorWidget,
   network: NetworkWidget,
   calendar: CalendarWidget,

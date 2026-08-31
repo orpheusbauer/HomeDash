@@ -11,7 +11,8 @@
 ## Installation
 
 ```powershell
-git clone https://github.com/orpheusbauer/HomeDash.git
+$GitHubRepository = "VOTRE_COMPTE_GITHUB/HomeDash"
+git clone "https://github.com/$GitHubRepository.git"
 Set-Location HomeDash
 Copy-Item .env.example .env
 npm ci
@@ -30,6 +31,7 @@ Le web écoute sur 5173, l’API sur 4100. Vite proxyfie `/api`. La base de dév
 - `GOOGLE_OAUTH_*` : intégration Calendar côté serveur.
 - `HOMEDASH_GITHUB_REPOSITORY` : releases à consulter.
 - `HOMEDASH_GITHUB_TOKEN_FILE` : token GitHub lecture seule lorsque le dépôt est privé.
+- `HOMEDASH_ANDROID_UPDATE_CACHE` : cache borné des APK vérifiées servies aux tablettes associées.
 - `HOMEDASH_SYSTEM_METRICS_INTERVAL_MS` : période des métriques, 30 s sur le Zero.
 - `HOMEDASH_ENABLE_MOCK_SENSORS` : animation périodique des mocks, désactivée en production.
 - `HOMEDASH_UPDATER_SOCKET` et `*_TOKEN_FILE` : ancien agent Docker, absent de la cible Zero.
@@ -83,8 +85,8 @@ Le build Android est aussi exécuté par GitHub Actions, car le poste actuel peu
 Après `npm run build`, Linux ou Git Bash peut reproduire l’asset de release :
 
 ```bash
-bash deployment/raspberry-pi-zero/package-native.sh 0.2.1 output
-sha256sum --check output/homedash-native-0.2.1.tar.gz.sha256
+bash deployment/raspberry-pi-zero/package-native.sh 0.3.0 output
+sha256sum --check output/homedash-native-0.3.0.tar.gz.sha256
 ```
 
 L’archive contient les trois dossiers `dist` et les manifests nécessaires à `npm ci --omit=dev`. Elle ne contient ni `node_modules`, ni secrets, ni données. Ne lancez pas la chaîne de build sur le Zero ARMv6.

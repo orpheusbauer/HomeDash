@@ -140,8 +140,7 @@ La correction doit être publiée sous un nouveau tag, jamais en déplaçant `v0
 cd /opt/homedash/repository
 git fetch --tags origin
 git checkout v0.2.1
-sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
 ```
 
 Il faut relancer **l’installeur complet**, et pas seulement `homedash-update-native`, car cette version met aussi à jour les unités systemd, la politique de core dumps, la limite du journal et le timer de surveillance disque.

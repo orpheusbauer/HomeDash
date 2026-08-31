@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { installUpdate, isNewer } from './updates.js';
+import { installUpdate, isNewer, parseAndroidChecksum } from './updates.js';
 
 describe('mises à jour', () => {
   it('compare les versions sémantiques', () => {
@@ -13,5 +13,15 @@ describe('mises à jour', () => {
     await expect(
       installUpdate({ version: 'latest', image: 'docker.io/attacker/image', digest: 'bad' }),
     ).rejects.toThrow();
+  });
+
+  it('n’accepte que la somme SHA-256 associée au nom exact de l’APK', () => {
+    const digest = 'a'.repeat(64);
+    expect(
+      parseAndroidChecksum(`${digest}  homedash-kiosk-0.3.0.apk\n`, 'homedash-kiosk-0.3.0.apk'),
+    ).toBe(digest);
+    expect(() =>
+      parseAndroidChecksum(`${digest}  autre.apk\n`, 'homedash-kiosk-0.3.0.apk'),
+    ).toThrow();
   });
 });

@@ -10,10 +10,9 @@ import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
-import android.os.PowerManager
+import android.provider.Settings
 import android.view.Gravity
 import android.view.View
-import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -32,6 +31,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -40,13 +40,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 class MainActivity : ComponentActivity() {
     private val preferences by lazy { getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE) }
     private var webView: WebView? = null
     private var deviceAdminRequestPending = false
+    private var pendingUpdateVersion: String? = null
     private var exitingToAndroid = false
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -56,10 +59,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         applySavedOrientation()
-        window.addFlags(
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-        )
         leaveLegacyKioskMode()
         hideSystemBars()
         onBackPressedDispatcher.addCallback(this) { exitToAndroid() }
@@ -94,14 +93,17 @@ class MainActivity : ComponentActivity() {
             ).show()
             if (webView == null) showSetup()
         }
+        pendingUpdateVersion?.let { version ->
+            if (packageManager.canRequestPackageInstalls()) {
+                pendingUpdateVersion = null
+                downloadAndInstallUpdate(version)
+            }
+        }
     }
 
     override fun onStop() {
         super.onStop()
-        val screenIsOn = getSystemService(PowerManager::class.java).isInteractive
-        if (!isAutoScreenOffEnabled() || screenIsOn) {
-            stopService(Intent(this, PresenceService::class.java))
-        }
+        stopService(Intent(this, PresenceService::class.java))
     }
 
     private fun leaveLegacyKioskMode() {
@@ -228,8 +230,8 @@ class MainActivity : ComponentActivity() {
             }
         val url =
             EditText(this).apply {
-                hint = "Adresse, ex. https://192.168.1.124"
-                setText(preferences.getString(KEY_SERVER_URL, "https://192.168.1.124"))
+                hint = "Adresse, ex. https://homedash.local"
+                setText(preferences.getString(KEY_SERVER_URL, "https://homedash.local"))
                 isSingleLine = true
             }
         val code =
@@ -273,7 +275,8 @@ class MainActivity : ComponentActivity() {
                 text =
                     "Le code d’association n’est nécessaire qu’une fois. " +
                     "L’orientation reste ensuite modifiable dans Paramètres > Affichage tablette. " +
-                    "L’extinction après absence est facultative et ne verrouille jamais HomeDash en mode kiosque."
+                    "Le délai de veille Android reste toujours prioritaire. L’extinction après absence " +
+                    "est facultative et peut verrouiller l’écran plus tôt."
                 gravity = Gravity.CENTER
             }
         listOf(
@@ -411,6 +414,131 @@ class MainActivity : ComponentActivity() {
         moveTaskToBack(true)
     }
 
+    private fun requestAndroidUpdate(version: String) {
+        if (!VERSION_PATTERN.matches(version)) {
+            Toast.makeText(this, "Version de mise à jour invalide", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (
+            preferences.getString(KEY_DEVICE_ID, null).isNullOrBlank() ||
+                preferences.getString(KEY_DEVICE_TOKEN, null).isNullOrBlank()
+        ) {
+            Toast.makeText(
+                this,
+                "Associez d’abord cette tablette dans les paramètres HomeDash.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+        if (!packageManager.canRequestPackageInstalls()) {
+            pendingUpdateVersion = version
+            Toast.makeText(
+                this,
+                "Autorisez HomeDash à installer sa mise à jour, puis revenez à l’application.",
+                Toast.LENGTH_LONG,
+            ).show()
+            runCatching {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName"),
+                    ),
+                )
+            }.onFailure {
+                pendingUpdateVersion = null
+                Toast.makeText(this, "Réglage Android indisponible", Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        downloadAndInstallUpdate(version)
+    }
+
+    private fun downloadAndInstallUpdate(version: String) {
+        Toast.makeText(this, "Téléchargement de HomeDash $version…", Toast.LENGTH_LONG).show()
+        lifecycleScope.launch {
+            try {
+                val apk = withContext(Dispatchers.IO) { downloadUpdate(version) }
+                val uri =
+                    FileProvider.getUriForFile(
+                        this@MainActivity,
+                        "$packageName.updates",
+                        apk,
+                    )
+                val intent =
+                    Intent(Intent.ACTION_INSTALL_PACKAGE)
+                        .setData(uri)
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                        .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+                startActivity(intent)
+            } catch (error: Exception) {
+                Toast.makeText(
+                    this@MainActivity,
+                    error.message ?: "Mise à jour impossible",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+        }
+    }
+
+    private fun downloadUpdate(version: String): File {
+        val serverUrl = preferences.getString(KEY_SERVER_URL, null) ?: error("Serveur non configuré")
+        val deviceId = preferences.getString(KEY_DEVICE_ID, null) ?: error("Tablette non associée")
+        val token = preferences.getString(KEY_DEVICE_TOKEN, null) ?: error("Tablette non associée")
+        val connection =
+            URL("$serverUrl/api/v1/devices/$deviceId/updates/android/$version/apk")
+                .openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 120_000
+        connection.setRequestProperty("Accept", "application/vnd.android.package-archive")
+        connection.setRequestProperty("Authorization", "Bearer $token")
+        try {
+            if (connection.responseCode !in 200..299) {
+                throw IllegalStateException("Téléchargement refusé (${connection.responseCode})")
+            }
+            val expectedDigest = connection.getHeaderField("X-HomeDash-SHA256")?.lowercase()
+            if (expectedDigest == null || !SHA256_PATTERN.matches(expectedDigest)) {
+                throw IllegalStateException("Somme SHA-256 absente ou invalide")
+            }
+            if (connection.contentLengthLong > MAX_APK_BYTES) {
+                throw IllegalStateException("APK trop volumineuse")
+            }
+
+            val directory = File(cacheDir, "updates").apply { mkdirs() }
+            directory.listFiles()?.forEach { if (it.isFile) it.delete() }
+            val temporary = File(directory, ".homedash-kiosk-$version.apk.tmp")
+            val destination = File(directory, "homedash-kiosk-$version.apk")
+            val digest = MessageDigest.getInstance("SHA-256")
+            var received = 0L
+            connection.inputStream.use { input ->
+                temporary.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        received += count
+                        if (received > MAX_APK_BYTES) throw IllegalStateException("APK trop volumineuse")
+                        digest.update(buffer, 0, count)
+                        output.write(buffer, 0, count)
+                    }
+                }
+            }
+            val actualDigest = digest.digest().joinToString("") { "%02x".format(it) }
+            if (actualDigest != expectedDigest) {
+                temporary.delete()
+                throw IllegalStateException("Échec de la vérification SHA-256")
+            }
+            if (!temporary.renameTo(destination)) {
+                temporary.delete()
+                throw IllegalStateException("Impossible de préparer l’APK")
+            }
+            return destination
+        } finally {
+            connection.disconnect()
+        }
+    }
+
     private inner class HomeDashBridge {
         @JavascriptInterface
         fun getOrientation(): String =
@@ -419,6 +547,14 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun setOrientation(value: String) {
             runOnUiThread { this@MainActivity.setOrientation(value) }
+        }
+
+        @JavascriptInterface
+        fun getAppVersion(): String = BuildConfig.VERSION_NAME
+
+        @JavascriptInterface
+        fun installAndroidUpdate(version: String) {
+            runOnUiThread { requestAndroidUpdate(version) }
         }
 
         @JavascriptInterface
@@ -443,8 +579,13 @@ class MainActivity : ComponentActivity() {
         private const val KEY_SERVER_URL = "serverUrl"
         private const val KEY_ORIENTATION = "orientation"
         private const val KEY_AUTO_SCREEN_OFF = "autoScreenOff"
+        private const val KEY_DEVICE_ID = "deviceId"
+        private const val KEY_DEVICE_TOKEN = "deviceToken"
         private const val ORIENTATION_LANDSCAPE = "landscape"
         private const val ORIENTATION_PORTRAIT = "portrait"
         private const val ANDROID_BRIDGE_NAME = "HomeDashAndroid"
+        private const val MAX_APK_BYTES = 100L * 1024L * 1024L
+        private val VERSION_PATTERN = Regex("^\\d+\\.\\d+\\.\\d+$")
+        private val SHA256_PATTERN = Regex("^[a-f0-9]{64}$")
     }
 }

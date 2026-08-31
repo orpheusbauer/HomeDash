@@ -87,7 +87,7 @@ export async function getWeather(
   try {
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { 'User-Agent': 'HomeDash/0.1 (personal local dashboard)' },
+      headers: { 'User-Agent': 'HomeDash/0.3 (self-hosted dashboard)' },
     });
     if (!response.ok) throw new Error(`Open-Meteo ${response.status}`);
     const data = openMeteoSchema.parse(await response.json());

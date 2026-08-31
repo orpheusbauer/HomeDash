@@ -337,15 +337,23 @@ export function App() {
                 <RotateCcw size={18} />
                 Annuler
               </button>
-              <button className="button button--primary" onClick={() => setEditing(false)}>
+              <button
+                className="button button--primary"
+                onClick={() => setEditing(false)}
+                aria-label="Terminer la modification"
+              >
                 <Lock size={18} />
-                Terminer
+                <span>Terminer</span>
               </button>
             </>
           ) : (
-            <button className="button button--ghost" onClick={requestEditing}>
+            <button
+              className="button button--ghost"
+              onClick={requestEditing}
+              aria-label="Modifier le dashboard"
+            >
               <Pencil size={18} />
-              Modifier
+              <span>Modifier</span>
             </button>
           )}
           <button className="icon-button" onClick={requestSettings} aria-label="Paramètres">

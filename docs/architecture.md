@@ -104,7 +104,7 @@ Le serveur web n’a aucun droit `sudo` et ne peut pas déclencher cette opérat
 Une CA HomeDash est créée une seule fois sous `/var/lib/homedash/tls`. Elle signe un certificat Nginx contenant :
 
 - `DNS:homedash.local` ;
-- `IP:192.168.1.124`.
+- `IP:IP_RÉSERVÉE_DU_PI`.
 
 Seul `root-ca.crt` est exporté vers la tablette. La clé `root-ca.key` et la clé serveur restent sur le Pi et dans les sauvegardes chiffrées.
 

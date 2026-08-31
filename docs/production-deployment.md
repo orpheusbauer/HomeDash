@@ -1,4 +1,4 @@
-# Passage définitif en production — HomeDash 0.2.1
+# Passage définitif en production — HomeDash 0.3.0
 
 Ce document est la procédure courte et ordonnée à suivre maintenant que le Raspberry Pi et la tablette sont physiquement disponibles. Les guides spécialisés donnent les détails et le dépannage : [installation-raspberry-pi.md](installation-raspberry-pi.md), [android-kiosk.md](android-kiosk.md), [updates.md](updates.md), [backup-and-restore.md](backup-and-restore.md) et [crash-loop-recovery.md](crash-loop-recovery.md).
 
@@ -7,13 +7,13 @@ Ce document est la procédure courte et ordonnée à suivre maintenant que le Ra
 À la fin :
 
 - le Pi Zero démarre HomeDash seul sous `systemd`, sans Docker ;
-- Nginx fournit `https://192.168.1.124` ;
+- Nginx fournit `https://homedash.local` et l’adresse IP réservée au Pi ;
 - la tablette ouvre automatiquement HomeDash après un reboot ;
 - l’icône HomeDash permet de le relancer à tout moment ;
-- le plein écran masque les barres système, un glissement inférieur rappelle Accueil/Retour/Récentes, et le bouton **Android** quitte directement l’application ;
+- le plein écran masque les barres système, un glissement inférieur rappelle Accueil/Retour/Récentes, le bouton **Android** quitte directement l’application et le délai de veille Android reste actif ;
 - portrait/paysage se choisit depuis les paramètres ;
 - les futures versions du Pi proviennent des Releases GitHub ;
-- les futures APK signées s’installent sans ADB et sans perdre l’association.
+- les futures APK signées s’installent depuis les paramètres HomeDash, sans ADB, GitHub sur la tablette, nouveau certificat ou perte d’association.
 
 ## Phase A — préparer GitHub depuis le PC
 
@@ -33,7 +33,8 @@ Sans eux, la Release doit échouer : n’utilisez pas l’artifact debug comme s
 ### A2. Contrôler, committer et pousser
 
 ```powershell
-cd "C:\Users\orphe\OneDrive\Bureau\Orpheus\ProjetHomeDash\HomeDash"
+$ProjectDirectory = "C:\chemin\vers\HomeDash"
+Set-Location $ProjectDirectory
 
 npm.cmd ci
 npm.cmd run format:check
@@ -51,30 +52,32 @@ git push origin main
 
 Dans **GitHub > Actions > CI**, attendez que `web-server` et `android` soient verts.
 
-### A3. Créer la Release 0.2.1
+### A3. Créer la Release 0.3.0
 
 ```powershell
-git tag -a v0.2.1 -m "HomeDash 0.2.1 - correction Raspberry Pi"
-git push origin v0.2.1
+git tag -a v0.3.0 -m "HomeDash 0.3.0 - météo horaire et mises à jour Android"
+git push origin v0.3.0
 ```
 
 Dans **Actions > Release**, attendez le vert. Vérifiez ces quatre fichiers publiés ; GitHub ajoute séparément ses deux archives « Source code » :
 
 ```text
-homedash-native-0.2.1.tar.gz
-homedash-native-0.2.1.tar.gz.sha256
-homedash-kiosk-0.2.1.apk
-homedash-kiosk-0.2.1.apk.sha256
+homedash-native-0.3.0.tar.gz
+homedash-native-0.3.0.tar.gz.sha256
+homedash-kiosk-0.3.0.apk
+homedash-kiosk-0.3.0.apk.sha256
 ```
 
 ## Phase B — mettre le Raspberry Pi en production
 
-Toutes les commandes de cette phase sont lancées depuis le PC au moyen de SSH, mais elles s’exécutent sur le Pi. En production, aucun serveur HomeDash n’est lancé sur le PC. Le PC et la tablette utilisent tous deux `https://192.168.1.124` une fois le service du Pi opérationnel.
+Toutes les commandes de cette phase sont lancées depuis le PC au moyen de SSH, mais elles s’exécutent sur le Pi. En production, aucun serveur HomeDash n’est lancé sur le PC. Le PC et la tablette utilisent tous deux `https://homedash.local` une fois le service du Pi opérationnel.
 
 Connectez-vous en SSH :
 
 ```powershell
-ssh votre-utilisateur@192.168.1.124
+$PiHost = "homedash.local"
+$PiUser = "VOTRE_UTILISATEUR_DU_PI"
+ssh "$PiUser@$PiHost"
 ```
 
 ### B1. Vérifications préalables
@@ -87,21 +90,20 @@ free -h
 df -h /
 ```
 
-Le Zero original doit afficher `armv6l` et `32`. L’adresse réservée doit être `192.168.1.124`.
+Le Zero original doit afficher `armv6l` et `32`. Notez l’adresse affichée par `hostname -I` et réservez-la dans votre routeur.
 
-### B2. Mettre à jour le clone et installer 0.2.1
+### B2. Mettre à jour le clone et installer 0.3.0
 
 ```bash
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.2.1
+git checkout v0.3.0
 
-sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
 ```
 
-Pour `0.2.1`, l’installeur complet est obligatoire même sur une machine déjà installée : la release met à jour l’unité systemd, retire l’ancien agent Docker et installe les protections de stockage. La configuration, la base, les certificats et le token GitHub existants sont conservés.
+Pour `0.3.0`, l’installeur complet est obligatoire même sur une machine déjà installée : la release conserve les protections de stockage et ajoute la configuration nécessaire au cache APK vérifié. La configuration, la base, les certificats et le token GitHub existants sont conservés.
 
 ### B3. Valider le Pi
 
@@ -114,11 +116,11 @@ sudo systemctl is-active homedash-updater.service || true
 cat /proc/sys/kernel/core_pattern
 curl --fail http://127.0.0.1:4100/health/ready
 curl --fail --cacert /var/lib/homedash/tls/root-ca.crt \
-  https://192.168.1.124/health/ready
+  https://homedash.local/health/ready
 sudo journalctl -u homedash -n 100 --no-pager
 ```
 
-Résultats attendus : version `0.2.1`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
+Résultats attendus : version `0.3.0`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
 
 Un navigateur affichant `502 Bad Gateway nginx` signifie que Nginx est joignable, mais que `curl http://127.0.0.1:4100/health/ready` échoue sur le Pi. Dans ce cas, ne commencez pas la phase tablette : suivez la section 3 de [android-kiosk.md](android-kiosk.md), notamment `systemctl status`, `journalctl` et la relance de l’installeur natif.
 
@@ -130,14 +132,14 @@ Suivez [backup-and-restore.md](backup-and-restore.md), puis copiez l’archive p
 
 ### C1. Retirer une ancienne version debug
 
-Si HomeDash `0.1.x` est installé, désinstallez-le une seule fois avant l’APK signée `0.2.1`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
+Si une ancienne APK debug est installée, désinstallez-la une seule fois avant l’APK signée `0.3.0`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
 
 ### C2. Installer sans câble
 
 Depuis Chrome sur la tablette :
 
-1. ouvrez la Release GitHub `v0.2.1` ;
-2. téléchargez `homedash-kiosk-0.2.1.apk` ;
+1. ouvrez la Release GitHub `v0.3.0` ;
+2. téléchargez `homedash-kiosk-0.3.0.apk` ;
 3. autorisez temporairement l’installation depuis Chrome ;
 4. installez l’APK ;
 5. retirez cette autorisation ;
@@ -146,14 +148,14 @@ Depuis Chrome sur la tablette :
 
 ### C3. Associer et choisir l’orientation
 
-1. URL : `https://192.168.1.124` ;
+1. URL : `https://homedash.local` ou l’adresse IP réservée au Pi ;
 2. dans HomeDash, Paramètres, PIN `0000`, Tablettes, **Associer** ;
 3. saisissez le code sur la tablette ;
 4. choisissez paysage ou portrait ;
 5. accordez caméra et notifications ;
 6. configurez batterie **Sans restriction** et **Démarrage automatique** dans Android.
 
-L’extinction réelle après 90 secondes d’absence est facultative. Activez-la depuis l’écran natif uniquement après avoir lu la section 8 de [android-kiosk.md](android-kiosk.md) : elle utilise une autorisation Android standard, jamais Device Owner ou le verrouillage kiosque.
+Le délai de veille configuré dans Android fonctionne directement avec HomeDash `0.3.0`. Le verrouillage anticipé après 90 secondes d’absence reste facultatif. Activez-le depuis l’écran natif uniquement après avoir lu la section 8 de [android-kiosk.md](android-kiosk.md) : il utilise une autorisation Android standard, jamais Device Owner ou le verrouillage kiosque.
 
 ### C4. Tester les sorties avant le montage
 
@@ -165,7 +167,8 @@ Vérifiez séparément :
 - relance par l’icône HomeDash ;
 - arrêt de l’indicateur caméra après la sortie ;
 - retour du service de présence après réouverture.
-- si l’extinction après absence est activée : écran éteint, réveil et désactivation de l’autorisation.
+- extinction selon le délai Android, puis affichage normal de l’écran de verrouillage au réveil ;
+- si le verrouillage après absence est activé : verrouillage anticipé et désactivation possible de l’autorisation.
 
 Ne montez pas la tablette au mur si l’un de ces chemins ne fonctionne pas.
 
@@ -211,7 +214,7 @@ Sur la tablette, contrôlez chaleur, charge et stabilité WebView. Aucun apparei
 4. attendre la CI ;
 5. créer un nouveau tag immuable ;
 6. mettre à jour le Pi avec `homedash-update-native` ;
-7. installer l’APK signée depuis Chrome uniquement si le code Android a changé.
+7. sur la tablette, ouvrir **Paramètres > Mises à jour > Vérifier**, puis installer l’APK proposée si le code Android a changé.
 
 ### Contrôler le système
 
@@ -234,7 +237,7 @@ curl --fail http://127.0.0.1:4100/health/ready
 
 Le projet peut être considéré comme installé proprement lorsque :
 
-- CI et Release `v0.2.1` sont vertes ;
+- CI et Release `v0.3.0` sont vertes ;
 - Pi et Nginx redémarrent seuls ;
 - la tablette possède l’APK signée ;
 - aucun câble/ADB n’est nécessaire au quotidien ;

@@ -50,7 +50,7 @@ echo "$BACKUP_FILE"
 Depuis le PC :
 
 ```powershell
-scp votre-utilisateur@192.168.1.124:/tmp/homedash-backup-AAAAmmjjTHHMMSSZ.tar.gz .
+scp VOTRE_UTILISATEUR_DU_PI@homedash.local:/tmp/homedash-backup-AAAAmmjjTHHMMSSZ.tar.gz .
 ```
 
 Ouvrez l’archive sur le PC pour vérifier qu’elle n’est pas corrompue, puis supprimez la copie temporaire du Pi :
@@ -154,7 +154,7 @@ sudo chmod 0640 /etc/homedash/tls/homedash.key
 sudo nginx -t
 sudo systemctl start nginx homedash
 curl --fail http://127.0.0.1:4100/health/ready
-curl --fail --cacert /var/lib/homedash/tls/root-ca.crt https://192.168.1.124/health/ready
+curl --fail --cacert /var/lib/homedash/tls/root-ca.crt https://homedash.local/health/ready
 ```
 
 10. Vérifiez les notes, appareils, tokens capteurs et Google Calendar.

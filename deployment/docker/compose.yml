@@ -1,6 +1,6 @@
 services:
   homedash:
-    image: ${HOMEDASH_IMAGE:-ghcr.io/orpheusbauer/homedash:v0.1.0}
+    image: ${HOMEDASH_IMAGE:-ghcr.io/example/homedash:v0.1.0}
     container_name: homedash
     restart: unless-stopped
     init: true

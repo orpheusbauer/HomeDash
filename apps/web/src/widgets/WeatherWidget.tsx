@@ -8,9 +8,9 @@ import type { WidgetComponentProps } from './types';
 
 function weatherParams(config: Record<string, unknown>) {
   return {
-    location: typeof config.location === 'string' ? config.location : 'Strasbourg',
-    latitude: typeof config.latitude === 'number' ? config.latitude : 48.5734,
-    longitude: typeof config.longitude === 'number' ? config.longitude : 7.7521,
+    location: typeof config.location === 'string' ? config.location : 'Paris',
+    latitude: typeof config.latitude === 'number' ? config.latitude : 48.8566,
+    longitude: typeof config.longitude === 'number' ? config.longitude : 2.3522,
   };
 }
 
@@ -116,6 +116,67 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
             </span>
           ))}
       </div>
+      <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
+    </div>
+  );
+}
+
+function localDay(value: string): string {
+  return value.slice(0, 10);
+}
+
+export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
+  const query = useWeather(instance.config);
+  if (!query.data)
+    return (
+      <div className="widget-centered">
+        <StatusBadge status={query.isError ? 'error' : 'loading'} />
+      </div>
+    );
+
+  const weather = query.data;
+  const today = localDay(weather.current.time);
+  const currentHour = weather.current.time.slice(0, 13);
+  const hours = weather.hourly.filter(
+    (hour) => localDay(hour.time) === today && hour.time.slice(0, 13) >= currentHour,
+  );
+
+  return (
+    <div className="hourly-weather-widget">
+      <div className="hourly-weather-summary">
+        <div>
+          <strong>{weather.location}</strong>
+          <span>
+            {new Date(`${today}T12:00:00`).toLocaleDateString('fr-FR', {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'long',
+            })}
+          </span>
+        </div>
+        <small>Mise à jour toutes les 15 min</small>
+      </div>
+      <div className="hourly-weather-list" aria-label="Prévisions météo heure par heure">
+        {hours.map((hour, index) => (
+          <div className={index === 0 ? 'is-current' : ''} key={hour.time}>
+            <time dateTime={hour.time}>
+              {index === 0
+                ? 'Maintenant'
+                : new Date(hour.time).toLocaleTimeString('fr-FR', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+            </time>
+            <WeatherIcon code={hour.weatherCode} size={28} />
+            <strong>{Math.round(hour.temperature)}°</strong>
+            <span className="hourly-weather-rain">
+              <Droplets size={13} />
+              {hour.precipitationProbability ?? 0}%
+            </span>
+          </div>
+        ))}
+      </div>
+      {hours.length === 0 && <p className="form-hint">La journée est terminée.</p>}
       <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
     </div>
   );

@@ -98,6 +98,16 @@ describe('API HomeDash', () => {
     expect(accepted.json<{ value: number }>().value).toBe(21.8);
   });
 
+  it("protège le téléchargement d'une mise à jour Android", async () => {
+    const denied = await app.inject({
+      method: 'GET',
+      url: '/api/v1/devices/00000000-0000-4000-8000-000000000000/updates/android/0.3.0/apk',
+    });
+
+    expect(denied.statusCode).toBe(401);
+    expect(denied.json<{ error: { code: string } }>().error.code).toBe('TABLET_UNAUTHORIZED');
+  });
+
   it('associe, authentifie puis révoque une tablette', async () => {
     const pairing = await app.inject({
       method: 'POST',

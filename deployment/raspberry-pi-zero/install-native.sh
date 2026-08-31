@@ -10,6 +10,26 @@ readonly TAG="$1"
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly DEPLOYMENT_DIRECTORY="${PROJECT_ROOT}/deployment/raspberry-pi-zero"
 
+detect_github_repository() {
+  local repository="${HOMEDASH_GITHUB_REPOSITORY:-}"
+  local origin=""
+  if [[ -z "${repository}" ]]; then
+    origin="$(git -C "${PROJECT_ROOT}" remote get-url origin 2>/dev/null || true)"
+    case "${origin}" in
+      https://github.com/*) repository="${origin#https://github.com/}" ;;
+      ssh://git@github.com/*) repository="${origin#ssh://git@github.com/}" ;;
+      git@*:*) repository="${origin#*:}" ;;
+    esac
+    repository="${repository%.git}"
+  fi
+  if [[ ! "${repository}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+    echo "Impossible de déduire le dépôt GitHub depuis le remote origin." >&2
+    echo "Relancez avec HOMEDASH_GITHUB_REPOSITORY=proprietaire/depot sudo -E $0 ${TAG}." >&2
+    exit 1
+  fi
+  printf '%s' "${repository}"
+}
+
 # Aucun programme lancé par l'installeur ne doit pouvoir remplir la carte SD en
 # cas de défaut natif. La politique persistante est installée plus bas.
 ulimit -c 0 || true
@@ -46,7 +66,7 @@ id homedash >/dev/null 2>&1 || useradd --system --gid homedash \
   --home-dir /var/lib/homedash --shell /usr/sbin/nologin homedash
 
 install -d -o root -g root -m 0755 /opt/homedash /opt/homedash/releases
-install -d -o homedash -g homedash -m 0750 /var/lib/homedash /var/lib/homedash/data /var/lib/homedash/data/backups
+install -d -o homedash -g homedash -m 0750 /var/lib/homedash /var/lib/homedash/data /var/lib/homedash/data/backups /var/lib/homedash/data/android-updates
 install -d -o root -g homedash -m 0750 /etc/homedash
 install -d -o root -g root -m 0755 /etc/sysctl.d /etc/systemd/journald.conf.d
 
@@ -63,11 +83,12 @@ ip_address="${HOMEDASH_IP_ADDRESS:-$(ip -4 route get 1.1.1.1 | awk '{for (i=1; i
 host_name="${HOMEDASH_HOSTNAME:-$(hostname).local}"
 if [[ ! "${host_name}" =~ ^[A-Za-z0-9.-]+$ || ! "${ip_address}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   echo "Impossible de déterminer un nom d'hôte ou une IPv4 valides." >&2
-  echo "Relancez avec HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 sudo -E …" >&2
+  echo "Relancez avec HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=IP_DU_PI sudo -E …" >&2
   exit 1
 fi
 
 if [[ ! -f /etc/homedash/homedash.env ]]; then
+  github_repository="$(detect_github_repository)"
   sensor_token="$(openssl rand -hex 32)"
   encryption_key="$(openssl rand -hex 32)"
   cat > /etc/homedash/homedash.env <<EOF
@@ -80,16 +101,23 @@ HOMEDASH_TIMEZONE=Europe/Paris
 HOMEDASH_ADMIN_PIN=0000
 HOMEDASH_SENSOR_INGEST_TOKEN=${sensor_token}
 HOMEDASH_ENCRYPTION_KEY=${encryption_key}
-HOMEDASH_GITHUB_REPOSITORY=orpheusbauer/HomeDash
+HOMEDASH_GITHUB_REPOSITORY=${github_repository}
 HOMEDASH_GITHUB_TOKEN_FILE=/etc/homedash/github-token
+HOMEDASH_ANDROID_UPDATE_CACHE=/var/lib/homedash/data/android-updates
 HOMEDASH_SYSTEM_METRICS_INTERVAL_MS=30000
 HOMEDASH_ENABLE_MOCK_SENSORS=false
 EOF
 fi
 
-# Migration des premières installations et application du PIN demandé.
-sed -i -e '/^HOMEDASH_ADMIN_TOKEN=/d' -e '/^HOMEDASH_ADMIN_PIN=/d' /etc/homedash/homedash.env
-printf '\nHOMEDASH_ADMIN_PIN=0000\n' >> /etc/homedash/homedash.env
+# Migration des premières installations, application du PIN demandé et cache
+# APK dans un répertoire persistant accessible à l'utilisateur homedash.
+sed -i \
+  -e '/^HOMEDASH_ADMIN_TOKEN=/d' \
+  -e '/^HOMEDASH_ADMIN_PIN=/d' \
+  -e '/^HOMEDASH_ANDROID_UPDATE_CACHE=/d' \
+  /etc/homedash/homedash.env
+printf '\nHOMEDASH_ADMIN_PIN=0000\nHOMEDASH_ANDROID_UPDATE_CACHE=/var/lib/homedash/data/android-updates\n' \
+  >> /etc/homedash/homedash.env
 chown root:homedash /etc/homedash/homedash.env
 chmod 0640 /etc/homedash/homedash.env
 

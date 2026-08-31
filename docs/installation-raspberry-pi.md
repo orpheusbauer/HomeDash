@@ -17,7 +17,8 @@ Le Pi ne lance ni Docker, ni TypeScript, ni Vite, ni Gradle. Il télécharge une
 Votre push GitHub initial est déjà fait. Après avoir récupéré les changements ARMv6 de ce document, poussez-les sur `main` et attendez que la nouvelle CI soit verte :
 
 ```powershell
-cd "C:\Users\orphe\OneDrive\Bureau\Orpheus\ProjetHomeDash\HomeDash"
+$ProjectDirectory = "C:\chemin\vers\HomeDash"
+Set-Location $ProjectDirectory
 git status --short
 git add .
 git commit -m "Add native Raspberry Pi Zero deployment"
@@ -26,19 +27,19 @@ git push origin main
 
 Dans GitHub, ouvrez **Actions > CI**. Le dernier run de `main` doit avoir les jobs `web-server` et `android` verts. Le job web vérifie aussi que l’archive native peut être créée et démarrée.
 
-Les tags jusqu’à `v0.2.0` existent déjà et ne doivent pas être déplacés. La correction de la boucle de crash doit être publiée en `v0.2.1`. Avant de créer ce tag, configurez les quatre secrets de signature décrits dans [android-kiosk.md](android-kiosk.md).
+Les tags déjà publiés ne doivent jamais être déplacés. Avant de créer `v0.3.0`, configurez les quatre secrets de signature décrits dans [android-kiosk.md](android-kiosk.md).
 
 ```powershell
-git tag -a v0.2.1 -m "HomeDash 0.2.1 — correction Raspberry Pi"
-git push origin v0.2.1
+git tag -a v0.3.0 -m "HomeDash 0.3.0 — météo horaire et mises à jour Android"
+git push origin v0.3.0
 ```
 
 Attendez ensuite le workflow **Release**. La release doit contenir au minimum :
 
-- `homedash-native-0.2.1.tar.gz` ;
-- `homedash-native-0.2.1.tar.gz.sha256` ;
-- `homedash-kiosk-0.2.1.apk` ;
-- `homedash-kiosk-0.2.1.apk.sha256`.
+- `homedash-native-0.3.0.tar.gz` ;
+- `homedash-native-0.3.0.tar.gz.sha256` ;
+- `homedash-kiosk-0.3.0.apk` ;
+- `homedash-kiosk-0.3.0.apk.sha256`.
 
 Ne poursuivez pas l’installation si l’archive native ou son fichier SHA-256 manque.
 
@@ -49,13 +50,13 @@ Ne poursuivez pas l’installation si l’archive native ou son fichier SHA-256 
 3. Choisissez **Raspberry Pi OS Lite (32-bit)**. La variante Legacy Bookworm 32 bits est également acceptable.
 4. Dans les options avancées, configurez :
    - nom d’hôte `homedash` ;
-   - un utilisateur personnel, par exemple `orpheus` ;
+   - un utilisateur administrateur non générique, par exemple `homedash-admin` ;
    - un mot de passe long ;
    - Wi-Fi et pays `FR` si c’est un Zero W/WH ;
    - fuseau `Europe/Paris` et clavier français ;
    - SSH activé, idéalement avec la clé publique de votre PC.
 5. Écrivez la carte et démarrez le Pi avec une alimentation stable.
-6. Dans votre routeur, réservez l’adresse `192.168.1.124` au Pi. Une réservation DHCP est préférable à une IP statique saisie à deux endroits.
+6. Dans votre routeur, réservez l’adresse attribuée au Pi. Une réservation DHCP est préférable à une IP statique saisie à deux endroits.
 
 Un Zero sans Wi-Fi nécessite un adaptateur USB OTG Ethernet ou Wi-Fi compatible.
 
@@ -64,7 +65,9 @@ Un Zero sans Wi-Fi nécessite un adaptateur USB OTG Ethernet ou Wi-Fi compatible
 Depuis PowerShell :
 
 ```powershell
-ssh votre-utilisateur@192.168.1.124
+$PiHost = "homedash.local"
+$PiUser = "VOTRE_UTILISATEUR_DU_PI"
+ssh "$PiUser@$PiHost"
 ```
 
 Sur le Pi :
@@ -102,7 +105,7 @@ hostname -I
 ip -4 route
 ```
 
-Le Pi doit toujours avoir `192.168.1.124`. Si l’adresse a changé, corrigez d’abord la réservation DHCP : le certificat HTTPS contiendra cette IP.
+Le Pi doit conserver l’adresse réservée dans le routeur. Si elle a changé, corrigez d’abord la réservation DHCP : le certificat HTTPS contiendra cette IP.
 
 ## 5. Donner au Pi un accès Git en lecture seule
 
@@ -118,7 +121,7 @@ cat ~/.ssh/homedash_deploy.pub
 
 Copiez toute la ligne publique. Dans GitHub :
 
-1. ouvrez le dépôt `orpheusbauer/HomeDash` ;
+1. ouvrez votre dépôt HomeDash ;
 2. ouvrez **Settings > Deploy keys > Add deploy key** ;
 3. nommez-la `Raspberry Pi Zero HomeDash` ;
 4. collez la clé publique ;
@@ -144,15 +147,16 @@ ssh -T github-homedash
 ## 6. Cloner le dépôt dans `/opt/homedash/repository`
 
 ```bash
+GITHUB_REPOSITORY="VOTRE_COMPTE_GITHUB/HomeDash"
 sudo install -d -o "$USER" -g "$USER" -m 0755 /opt/homedash
-git clone git@github-homedash:orpheusbauer/HomeDash.git /opt/homedash/repository
+git clone "git@github-homedash:${GITHUB_REPOSITORY}.git" /opt/homedash/repository
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.2.1
+git checkout v0.3.0
 git status --short --branch
 ```
 
-Le statut doit être propre et indiquer le tag ou le commit de `v0.2.1`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release.
+Le statut doit être propre et indiquer le tag ou le commit de `v0.3.0`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release. L’installeur déduit automatiquement `VOTRE_COMPTE_GITHUB/HomeDash` depuis ce remote.
 
 ## 7. Créer un token GitHub limité pour télécharger la release privée
 
@@ -183,8 +187,7 @@ Toujours depuis le clone :
 
 ```bash
 cd /opt/homedash/repository
-sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
 ```
 
 Le script effectue les opérations suivantes :
@@ -195,12 +198,12 @@ Le script effectue les opérations suivantes :
 4. teste réellement `node:sqlite` ;
 5. crée l’utilisateur système non connecté `homedash` ;
 6. configure le PIN administrateur `0000` et génère deux secrets aléatoires dans `/etc/homedash/homedash.env` ;
-7. crée une autorité de certification locale et un certificat pour `homedash.local` et `192.168.1.124` ;
+7. crée une autorité de certification locale et un certificat pour `homedash.local` et l’IP détectée ;
 8. configure Nginx ;
 9. arrête et retire l’ancien `homedash-updater.service` Docker s’il subsiste ;
 10. limite les crash loops, désactive les core dumps persistants et borne le journal ;
 11. installe le contrôle du disque à 80 %, 90 % et 95 % ;
-12. télécharge l’archive `v0.2.1` et son SHA-256 depuis GitHub ;
+12. télécharge l’archive `v0.3.0` et son SHA-256 depuis GitHub ;
 13. installe uniquement les dépendances de production du serveur, sans les bibliothèques de build/front déjà compilé et avec les scripts npm désactivés ;
 14. démarre HomeDash et attend `/health/ready` ;
 15. restaure automatiquement la version/base précédente si le health check échoue.
@@ -218,14 +221,14 @@ sudo systemctl status homedash-disk-guard.timer --no-pager
 sudo systemctl is-active homedash-updater.service || true
 sudo journalctl -u homedash -n 100 --no-pager
 curl --fail http://127.0.0.1:4100/health/ready
-curl --fail --cacert /var/lib/homedash/tls/root-ca.crt https://192.168.1.124/health/ready
+curl --fail --cacert /var/lib/homedash/tls/root-ca.crt https://homedash.local/health/ready
 ```
 
 Valeurs attendues :
 
 - Node `v22.23.1` ;
 - architecture Node `arm` ;
-- version installée `0.2.1` ;
+- version installée `0.3.0` ;
 - services `active (running)` ;
 - timer disque `active (waiting)` et ancien updater `inactive` ou `unknown` ;
 - deux réponses de santé HTTP 200.
@@ -236,7 +239,7 @@ Les fichiers importants sont :
 
 ```text
 /opt/homedash/repository             clone Git et scripts
-/opt/homedash/releases/0.2.1         application précompilée
+/opt/homedash/releases/0.3.0         application précompilée
 /opt/homedash/current                lien vers la release active
 /etc/homedash/homedash.env           secrets et configuration
 /etc/homedash/github-token           token GitHub lecture seule
@@ -260,7 +263,7 @@ chmod 0644 "$HOME/homedash-root-ca.crt"
 Depuis le PC :
 
 ```powershell
-scp votre-utilisateur@192.168.1.124:homedash-root-ca.crt .
+scp "${PiUser}@${PiHost}:homedash-root-ca.crt" .
 ```
 
 Transférez `homedash-root-ca.crt` sur la tablette. Sous Android 10, cherchez généralement :
@@ -270,16 +273,16 @@ Transférez `homedash-root-ca.crt` sur la tablette. Sous Android 10, cherchez g�
 3. **Certificat CA** ;
 4. sélectionnez le fichier et confirmez.
 
-Testez ensuite `https://192.168.1.124` dans Chrome sur la tablette. Il ne doit rester aucune alerte de certificat. Si `homedash.local` fonctionne sur votre réseau, vous pouvez aussi utiliser `https://homedash.local`.
+Testez ensuite `https://homedash.local` dans Chrome sur la tablette. Il ne doit rester aucune alerte de certificat. Si mDNS ne fonctionne pas sur votre réseau, utilisez exactement l’IP réservée incluse dans le certificat.
 
 ## 11. Installer et associer l’application Android
 
-Téléchargez l’APK signée `homedash-kiosk-0.2.1.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md). N’utilisez plus l’artifact debug de la CI sur la tablette murale.
+Téléchargez l’APK signée `homedash-kiosk-0.3.0.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md). Cette installation manuelle active les futures mises à jour depuis HomeDash. N’utilisez plus l’artifact debug de la CI sur la tablette murale.
 
 Dans l’écran de configuration de l’application, utilisez :
 
 ```text
-https://192.168.1.124
+https://homedash.local
 ```
 
 Dans HomeDash depuis un navigateur administrateur :
@@ -303,7 +306,7 @@ Le navigateur échange ce PIN contre une session aléatoire valable huit heures 
 
 ## 12. ESP32 et port capteur limité
 
-Nginx écoute `192.168.1.124:4100` uniquement pour :
+Nginx écoute `IP_DU_PI:4100` uniquement pour :
 
 ```text
 POST /api/v1/sensors/ingest
@@ -312,7 +315,7 @@ POST /api/v1/sensors/ingest
 Toutes les autres routes sur ce port renvoient `403`. L’exemple ESP32 existant peut donc conserver :
 
 ```text
-http://192.168.1.124:4100/api/v1/sensors/ingest
+http://IP_DU_PI:4100/api/v1/sensors/ingest
 ```
 
 Le token capteur circule alors en clair sur le LAN. Utilisez un VLAN IoT isolé ou adaptez ultérieurement l’ESP32 à la CA privée et HTTPS. L’interface tablette et l’administration passent toujours par HTTPS.
@@ -369,9 +372,9 @@ Mise à jour vers une release future :
 ```bash
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.2.1
+git checkout v0.3.0
 sudo install -m 0755 deployment/raspberry-pi-zero/update-native.sh /usr/local/sbin/homedash-update-native
-sudo homedash-update-native v0.2.1
+sudo homedash-update-native v0.3.0
 ```
 
 Consultez [updates.md](updates.md) avant chaque mise à jour et [backup-and-restore.md](backup-and-restore.md) pour les sauvegardes.
@@ -385,7 +388,7 @@ Un `502` confirme que le PC atteint Nginx, mais que le serveur HomeDash derrièr
 Depuis le PC, connectez-vous d’abord au Pi :
 
 ```powershell
-ssh <UTILISATEUR_DU_PI>@192.168.1.124
+ssh "$PiUser@$PiHost"
 ```
 
 Puis, sur le Pi :
@@ -398,7 +401,7 @@ curl --fail --show-error http://127.0.0.1:4100/health/ready
 sudo journalctl -u homedash -n 150 --no-pager
 ```
 
-Si `current`, le code ou la configuration manque, revenez à la section 8 et relancez l’installeur `install-native.sh v0.2.1`. Si les fichiers existent :
+Si `current`, le code ou la configuration manque, revenez à la section 8 et relancez l’installeur `install-native.sh v0.3.0`. Si les fichiers existent :
 
 ```bash
 sudo systemctl reset-failed homedash
@@ -429,7 +432,7 @@ Le binaire doit finir par `node-v22.23.1-linux-armv6l/bin/node`. N’installez p
 
 ### `npm ci` est tué
 
-Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.2.1`.
+Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.3.0`.
 
 ### Nginx ne démarre pas
 
@@ -439,7 +442,7 @@ sudo journalctl -u nginx -n 100 --no-pager
 sudo ss -ltnp | grep -E ':80|:443|:4100'
 ```
 
-Le serveur Node doit écouter seulement `127.0.0.1:4100`; Nginx écoute `192.168.1.124:4100` pour l’ESP32.
+Le serveur Node doit écouter seulement `127.0.0.1:4100`; Nginx écoute `IP_DU_PI:4100` pour l’ESP32.
 
 ### Le certificat est refusé
 

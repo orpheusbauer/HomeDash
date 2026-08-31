@@ -5,6 +5,8 @@ interface HomeDashAndroidBridge {
   setOrientation(value: DashboardOrientation): void;
   openAppSettings(): void;
   exitToAndroid(): void;
+  getAppVersion?: () => string;
+  installAndroidUpdate?: (version: string) => void;
 }
 
 declare global {
@@ -32,4 +34,16 @@ export function openAndroidAppSettings(): void {
 
 export function exitToAndroid(): void {
   window.HomeDashAndroid?.exitToAndroid();
+}
+
+export function getAndroidAppVersion(): string | null {
+  return window.HomeDashAndroid?.getAppVersion?.() ?? null;
+}
+
+export function supportsAndroidUpdates(): boolean {
+  return typeof window.HomeDashAndroid?.installAndroidUpdate === 'function';
+}
+
+export function installAndroidUpdate(version: string): void {
+  window.HomeDashAndroid?.installAndroidUpdate?.(version);
 }
