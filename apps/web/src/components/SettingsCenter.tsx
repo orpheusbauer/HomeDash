@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
   CalendarDays,
   Download,
+  ExternalLink,
   Link2,
   RefreshCw,
   ShieldCheck,
@@ -11,6 +12,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { TabletDevice } from '@homedash/contracts';
+import {
+  getDashboardOrientation,
+  hasAndroidBridge,
+  openAndroidAppSettings,
+  setDashboardOrientation,
+  type DashboardOrientation,
+} from '../android-bridge';
 import { api } from '../api';
 
 type Backup = { filename: string; size: number; createdAt: string };
@@ -33,6 +41,8 @@ export function SettingsCenter({
   onRequestUnlock: () => void;
 }) {
   const client = useQueryClient();
+  const isAndroidApp = hasAndroidBridge();
+  const [orientation, setOrientation] = useState<DashboardOrientation | null>(null);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const updates = useQuery({
     queryKey: ['admin', 'updates'],
@@ -74,6 +84,15 @@ export function SettingsCenter({
       api('/api/v1/updates/install', { method: 'POST', body: JSON.stringify({ manifest }) }, true),
   });
 
+  useEffect(() => {
+    if (isAndroidApp) setOrientation(getDashboardOrientation());
+  }, [isAndroidApp]);
+
+  function changeOrientation(value: DashboardOrientation) {
+    setOrientation(value);
+    setDashboardOrientation(value);
+  }
+
   if (!authenticated)
     return (
       <div className="settings-gate">
@@ -88,6 +107,48 @@ export function SettingsCenter({
 
   return (
     <div className="settings-sections">
+      {isAndroidApp && (
+        <section className="settings-section settings-section--tablet-display">
+          <div className="settings-section__title">
+            <Tablet size={20} />
+            <div>
+              <h3>Affichage tablette</h3>
+              <p>
+                Choisissez le sens du dashboard. Les cartes et la navigation se réorganisent
+                automatiquement.
+              </p>
+            </div>
+          </div>
+          <div
+            className="orientation-selector"
+            role="group"
+            aria-label="Orientation de la tablette"
+          >
+            <button
+              className={orientation === 'landscape' ? 'is-active' : ''}
+              onClick={() => changeOrientation('landscape')}
+            >
+              <span className="orientation-preview orientation-preview--landscape" />
+              Paysage
+            </button>
+            <button
+              className={orientation === 'portrait' ? 'is-active' : ''}
+              onClick={() => changeOrientation('portrait')}
+            >
+              <span className="orientation-preview orientation-preview--portrait" />
+              Portrait
+            </button>
+          </div>
+          <button className="button button--ghost" onClick={openAndroidAppSettings}>
+            <ExternalLink size={17} />
+            Adresse du serveur et association
+          </button>
+          <p className="form-hint">
+            Pour quitter HomeDash, utilisez le bouton Android dans la barre supérieure ou le bouton
+            Retour de la tablette.
+          </p>
+        </section>
+      )}
       <section className="settings-section">
         <div className="settings-section__title">
           <Download size={20} />

@@ -153,6 +153,10 @@ button {
   gap: 8px;
 }
 
+.android-exit-action {
+  color: var(--accent-strong);
+}
+
 .button,
 .icon-button,
 .mobile-editbar button {
@@ -293,6 +297,49 @@ button {
 
 .dashboard-grid {
   min-height: 300px;
+}
+
+.orientation-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.orientation-selector button {
+  display: flex;
+  min-height: 74px;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--muted);
+  background: var(--surface-soft);
+  cursor: pointer;
+  font-weight: 750;
+}
+
+.orientation-selector button.is-active {
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.orientation-preview {
+  display: inline-block;
+  border: 2px solid currentColor;
+  border-radius: 5px;
+}
+
+.orientation-preview--landscape {
+  width: 32px;
+  height: 21px;
+}
+
+.orientation-preview--portrait {
+  width: 21px;
+  height: 32px;
 }
 
 .grid-stack-item-content.widget-card {
@@ -1453,6 +1500,74 @@ button {
 
   .forecast-hours {
     grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+@media (orientation: portrait) and (max-width: 1000px) {
+  .topbar {
+    grid-template-areas:
+      'brand actions'
+      'tabs tabs';
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    min-height: 118px;
+    padding: max(8px, env(safe-area-inset-top)) 12px 9px;
+  }
+
+  .brand {
+    grid-area: brand;
+  }
+
+  .page-tabs {
+    grid-area: tabs;
+    padding-bottom: 2px;
+  }
+
+  .page-tabs button {
+    min-height: 38px;
+    padding: 7px 13px;
+  }
+
+  .topbar__actions {
+    grid-area: actions;
+    min-width: 0;
+  }
+
+  .mobile-editbar {
+    top: 118px;
+  }
+
+  .dashboard-main {
+    padding: 18px 8px 48px;
+  }
+
+  .page-heading {
+    min-height: 50px;
+    padding-inline: 8px;
+  }
+
+  .page-heading h1 {
+    font-size: clamp(1.55rem, 6vw, 2.15rem);
+  }
+
+  .grid-stack-item-content.widget-card {
+    border-radius: 17px;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+  }
+
+  .connection-pill {
+    display: none;
+  }
+
+  .orientation-selector {
+    grid-template-columns: 1fr;
   }
 }
 

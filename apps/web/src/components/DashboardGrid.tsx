@@ -36,6 +36,14 @@ export function DashboardGrid({
     const grid = GridStack.init(
       {
         column: 12,
+        columnOpts: {
+          breakpointForWindow: true,
+          breakpoints: [
+            { w: 900, c: 6, layout: 'moveScale' },
+            { w: 560, c: 1, layout: 'list' },
+          ],
+          layout: 'moveScale',
+        },
         cellHeight: 86,
         margin: 10,
         float: true,
@@ -50,7 +58,7 @@ export function DashboardGrid({
     if (!grid) return;
     gridRef.current = grid;
     const onChange = (_event: Event, nodes: GridStackNode[]) => {
-      if (!readyRef.current) return;
+      if (!readyRef.current || !editing) return;
       const items = nodes
         .map((node) => {
           const id = node.el?.getAttribute('gs-id');

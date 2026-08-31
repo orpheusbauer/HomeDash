@@ -4,6 +4,7 @@ import {
   CloudOff,
   LayoutDashboard,
   Lock,
+  LogOut,
   Menu,
   Pencil,
   Plus,
@@ -20,6 +21,7 @@ import type {
   SystemMetrics,
   WidgetInstance,
 } from '@homedash/contracts';
+import { exitToAndroid, hasAndroidBridge } from './android-bridge';
 import { api, hasAdminSession, realtimeUrl } from './api';
 import { AdminDialog } from './components/AdminDialog';
 import { DashboardGrid } from './components/DashboardGrid';
@@ -64,6 +66,7 @@ export function App() {
   const [configuredWidget, setConfiguredWidget] = useState<WidgetInstance | null>(null);
   const [connection, setConnection] = useState<'online' | 'offline' | 'connecting'>('connecting');
   const [toast, setToast] = useState('');
+  const isAndroidApp = hasAndroidBridge();
   const revisionRef = useRef<Record<string, number>>({});
   const saveTimerRef = useRef<number | undefined>(undefined);
 
@@ -348,6 +351,16 @@ export function App() {
           <button className="icon-button" onClick={requestSettings} aria-label="Paramètres">
             <Settings size={20} />
           </button>
+          {isAndroidApp && (
+            <button
+              className="button button--ghost android-exit-action"
+              onClick={exitToAndroid}
+              aria-label="Quitter HomeDash et revenir à Android"
+            >
+              <LogOut size={18} />
+              <span>Android</span>
+            </button>
+          )}
         </div>
       </header>
 

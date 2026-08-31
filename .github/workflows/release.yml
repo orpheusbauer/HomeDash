@@ -21,6 +21,7 @@ jobs:
       - name: Build Raspberry Pi Zero native archive
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
+          test "$(cat VERSION)" = "$VERSION"
           bash deployment/raspberry-pi-zero/package-native.sh "$VERSION" "$RUNNER_TEMP/native-release"
           cp "$RUNNER_TEMP/native-release/"* .
       - uses: actions/setup-java@v4
@@ -31,12 +32,31 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.10.2
-      - run: gradle -p apps/android assembleDebug
+      - name: Prepare Android release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HOMEDASH_ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.HOMEDASH_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.HOMEDASH_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.HOMEDASH_ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64"
+          test -n "$KEYSTORE_PASSWORD"
+          test -n "$KEY_ALIAS"
+          test -n "$KEY_PASSWORD"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/homedash-release.jks"
+      - name: Build signed Android release
+        env:
+          HOMEDASH_ANDROID_KEYSTORE_FILE: ${{ runner.temp }}/homedash-release.jks
+          HOMEDASH_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.HOMEDASH_ANDROID_KEYSTORE_PASSWORD }}
+          HOMEDASH_ANDROID_KEY_ALIAS: ${{ secrets.HOMEDASH_ANDROID_KEY_ALIAS }}
+          HOMEDASH_ANDROID_KEY_PASSWORD: ${{ secrets.HOMEDASH_ANDROID_KEY_PASSWORD }}
+        run: gradle -p apps/android assembleRelease
       - name: Prepare release assets
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cp apps/android/app/build/outputs/apk/debug/app-debug.apk "homedash-kiosk-${VERSION}-debug.apk"
+          cp apps/android/app/build/outputs/apk/release/app-release.apk "homedash-kiosk-${VERSION}.apk"
+          sha256sum "homedash-kiosk-${VERSION}.apk" > "homedash-kiosk-${VERSION}.apk.sha256"
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" homedash-native-*.tar.gz homedash-native-*.sha256 homedash-kiosk-*-debug.apk --generate-notes --verify-tag
+        run: gh release create "$GITHUB_REF_NAME" homedash-native-*.tar.gz homedash-native-*.sha256 homedash-kiosk-*.apk homedash-kiosk-*.apk.sha256 --generate-notes --verify-tag

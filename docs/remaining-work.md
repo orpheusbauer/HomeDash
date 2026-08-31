@@ -1,83 +1,76 @@
-# Travail restant après l’adaptation Raspberry Pi Zero
+# Travail restant après HomeDash 0.2.0
 
-Le logiciel et le déploiement natif sont prêts à être testés. Les points suivants dépendent encore du vrai Pi Zero, de la tablette qunyiCO Y10 et des comptes externes.
+Le développement prévu pour la première installation murale est terminé. Le reste n’est plus une liste de fonctions indispensables à coder, mais une recette de validation sur le vrai Pi Zero, la qunyiCO Y10 et le réseau domestique.
 
-## Priorité 1 — valider la chaîne ARMv6 réelle
+La procédure active est [production-deployment.md](production-deployment.md).
 
-1. Pousser les changements ARMv6 sur `main`.
-2. Attendre la CI verte, y compris le smoke test de l’archive native.
-3. Créer le tag `v0.1.2` et vérifier les trois assets de release.
-4. Installer Raspberry Pi OS Lite 32 bits et confirmer `armv6l`/`32`.
-5. Cloner avec une Deploy key en lecture seule.
-6. Installer la release native selon [installation-raspberry-pi.md](installation-raspberry-pi.md).
-7. Confirmer sur le matériel que Node ARMv6 et `node:sqlite` démarrent sans `Illegal instruction`.
-8. Laisser le Pi fonctionner sept jours.
+## Obligatoire avant de déclarer l’installation terminée
 
-Mesures à relever : temps de démarrage, RSS Node, CPU au repos, température, espace microSD, erreurs OOM, temps d’une mise à jour et stabilité Wi-Fi.
+1. créer le keystore Android et ses quatre secrets GitHub ;
+2. obtenir une CI et une Release `v0.2.0` vertes ;
+3. installer l’archive native sur le Pi Zero réel ;
+4. confirmer `armv6l`, 32 bits et le fonctionnement de `node:sqlite` ;
+5. remplacer une dernière fois l’ancienne APK debug par l’APK signée ;
+6. vérifier ouverture, sortie Android, portrait et paysage ;
+7. laisser Pi et tablette fonctionner 48 heures ;
+8. créer une sauvegarde et la copier hors du Pi ;
+9. tester une mise à jour et un rollback réels ;
+10. conserver le keystore sur deux supports chiffrés.
 
-Critères : aucun crash, health check stable, reconnexion après coupure réseau, layout persistant, sauvegarde hors Pi et consommation mémoire acceptable.
+## Mesures matérielles à relever
 
-## Priorité 2 — tester une vraie mise à jour et son rollback
+### Raspberry Pi Zero
 
-- Publier une `v0.1.2` de test.
-- L’installer avec `sudo homedash-update-native v0.1.2`.
-- Vérifier la sauvegarde `pre-0.1.2-*` et le lien `current`.
-- Publier volontairement une release de test qui échoue au health check sur une branche/tag dédié.
-- Confirmer le retour automatique au code et à la base précédents.
-- Tester une restauration complète sur une seconde carte microSD si possible.
+- temps de démarrage après coupure électrique ;
+- mémoire Node au repos et lors d’une mise à jour ;
+- CPU au repos ;
+- erreurs OOM ;
+- stabilité Wi-Fi ;
+- espace libre microSD ;
+- temps de `npm ci` pendant une release.
 
-## Priorité 3 — stabiliser Android sur la Y10
+### Tablette
 
-À mesurer et adapter : fréquence CameraX/ML Kit, distance, faible lumière, permission caméra après boot, comportement de `lockNow`, réveil, politique batterie de la ROM et température en charge permanente.
+- température après 2 h, 24 h et 48 h ;
+- comportement de la batterie en charge permanente ;
+- ouverture automatique après reboot ;
+- reconnexion après coupure Wi-Fi et redémarrage du Pi ;
+- fiabilité de CameraX/ML Kit dans la lumière réelle de l’entrée ;
+- si l’option est utilisée : extinction après 90 secondes, réveil et comportement du verrouillage Android ;
+- lisibilité des cartes et onglets dans les deux orientations.
 
-Si la présence est instable :
+## Si la présence est instable
 
-1. garder l’écran très sombre au lieu de le verrouiller ;
-2. réduire l’analyse à 1–2 images/s ;
-3. ajouter un capteur PIR/mmWave via ESP32 ;
-4. utiliser la caméra seulement lorsque l’écran est actif.
+Dans cet ordre :
 
-Ajouter ensuite des tests Android instrumentés et une page diagnostic dédiée.
+1. vérifier permission caméra et batterie sans restriction ;
+2. dégager physiquement la caméra du support ;
+3. réduire la fréquence d’analyse à 1–2 images/s ;
+4. désactiver l’extinction automatique et garder l’écran très sombre si le verrouillage Android gêne ;
+5. utiliser un capteur PIR/mmWave via ESP32.
 
-## Priorité 4 — sécurité de release
+## Améliorations facultatives après stabilisation
 
-- Créer un keystore Android hors Git et produire une APK release signée.
-- Ajouter une attestation/signature de l’archive native en plus du SHA-256.
-- Tester la rotation et l’expiration du PAT GitHub en lecture seule.
-- Ajouter une rotation des tokens tablette.
-- Limiter le port ESP32 HTTP à un VLAN IoT ou passer l’exemple à HTTPS.
-- Conserver SSH par clé uniquement et n’ouvrir aucun port Internet.
-- Étudier un agent natif minimal avant d’autoriser une mise à jour depuis l’interface.
+- tests Android instrumentés sur la vraie Y10 ;
+- proxy local contrôlé pour télécharger l’APK depuis le Pi ;
+- rotation des tokens tablette ;
+- signature cryptographique de l’archive native en plus du SHA-256 ;
+- migration de l’ESP32 vers HTTPS ;
+- export/import JSON de la disposition ;
+- calendrier journées entières ;
+- plusieurs notes ;
+- capteurs humidité, qualité de l’air et présence externe ;
+- intégration Home Assistant optionnelle.
 
-## Priorité 5 — qualité et performances Zero
+## Définition de terminé pour 0.2.0
 
-- Ajouter des tests API sur le CRUD widgets/Calendar avec Google mocké.
-- Tester les migrations depuis chaque version de base publiée.
-- Ajouter Playwright au workflow pour édition, notes et persistance.
-- Ajouter une politique `stale/offline` temporelle aux capteurs.
-- Ajouter une rétention configurable des sauvegardes, sans supprimer la dernière copie saine.
-- Mesurer le coût des widgets météo/réseau/système sur un cœur ARMv6.
-- Si RSS ou latence dépassent les limites, profiler avant de retirer des fonctions.
-
-## Priorité 6 — ergonomie et extensions
-
-- Formulaire Calendar journées entières et choix de calendrier.
-- Page Paramètres dédiée.
-- Export/import JSON de la disposition.
-- Plusieurs notes créables.
-- Écran hors ligne dédié dans l’APK.
-- Tests accessibilité sur la vraie dalle.
-- Après stabilisation : humidité, qualité de l’air, historique court, Todo/courses et Home Assistant optionnel.
-
-## Définition de terminé pour 0.1.2 sur Zero
-
-- CI web/server, archive native et Android vertes ;
-- release native et SHA-256 disponibles ;
-- Node 22 ARMv6 vérifié sur le Pi ;
-- Pi et Nginx redémarrent seuls ;
-- tablette redémarre en kiosque et se reconnecte en HTTPS ;
-- notes/layout/pages persistent ;
-- météo/cache, capteurs, système et réseau fonctionnent ;
-- présence validée ou alternative matérielle choisie ;
-- backup complet copié hors Pi ;
+- release native et APK signée disponibles ;
+- aucun câble ADB nécessaire au quotidien ;
+- Pi, Nginx et tablette redémarrent seuls ;
+- bouton Accueil, Retour et bouton **Android** fonctionnels ;
+- paysage et portrait validés ;
+- notes, pages et dispositions persistantes ;
+- météo, capteurs, système et réseau fonctionnels ;
+- 48 heures sans crash ni chauffe anormale ;
+- sauvegarde chiffrée copiée hors Pi ;
 - mise à jour et rollback réellement testés.

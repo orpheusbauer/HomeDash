@@ -12,8 +12,8 @@ Un tag `vX.Y.Z` lance `.github/workflows/release.yml`. GitHub Actions :
 2. construit les contrats TypeScript, le serveur et l’interface Vite ;
 3. crée `homedash-native-X.Y.Z.tar.gz` ;
 4. crée son fichier `homedash-native-X.Y.Z.tar.gz.sha256` ;
-5. compile l’APK Android debug ;
-6. publie ces trois assets dans GitHub Releases.
+5. reconstruit le keystore depuis les secrets GitHub et compile l’APK Android release signée ;
+6. publie l’archive native, l’APK et leurs deux SHA-256 dans GitHub Releases.
 
 Le Pi ne compile aucun TypeScript et ne télécharge aucune image GHCR.
 
@@ -46,7 +46,8 @@ Dans **Actions > Release**, attendez le vert. Dans **Releases > v0.2.0**, vérif
 ```text
 homedash-native-0.2.0.tar.gz
 homedash-native-0.2.0.tar.gz.sha256
-homedash-kiosk-0.2.0-debug.apk
+homedash-kiosk-0.2.0.apk
+homedash-kiosk-0.2.0.apk.sha256
 ```
 
 L’absence du SHA-256 interdit l’installation automatique. Ne fabriquez pas ce fichier manuellement après coup : corrigez le workflow et créez une nouvelle version.

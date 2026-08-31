@@ -13,6 +13,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
@@ -33,12 +34,22 @@ class PresenceService : LifecycleService() {
     private val executor = Executors.newSingleThreadExecutor()
     private val analyzing = AtomicBoolean(false)
     private val handler = Handler(Looper.getMainLooper())
-    private var lastPresenceAt = System.currentTimeMillis()
+    private var lastPresenceAt = SystemClock.elapsedRealtime()
+    private var lastAnalysisAt = 0L
+    private var lastTelemetryAt = 0L
     private var present = false
     private var lockedForAbsence = false
     private val detector = FaceDetection.getClient(FaceDetectorOptions.Builder().setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST).build())
-    private val telemetryTask = object : Runnable {
-        override fun run() { sendTelemetry(); lockIfAbsent(); handler.postDelayed(this, 60_000) }
+    private val maintenanceTask = object : Runnable {
+        override fun run() {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastTelemetryAt >= TELEMETRY_INTERVAL_MS) {
+                lastTelemetryAt = now
+                sendTelemetry()
+            }
+            lockIfAbsent()
+            handler.postDelayed(this, SCREEN_CHECK_INTERVAL_MS)
+        }
     }
 
     override fun onCreate() {
@@ -50,7 +61,7 @@ class PresenceService : LifecycleService() {
             .setContentText("Détection de présence locale").setOngoing(true).setContentIntent(launch).build()
         startForeground(NOTIFICATION_ID, notification)
         startCamera()
-        telemetryTask.run()
+        maintenanceTask.run()
     }
 
     private fun startCamera() {
@@ -69,14 +80,17 @@ class PresenceService : LifecycleService() {
     }
 
     private fun analyze(image: ImageProxy) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastAnalysisAt < ANALYSIS_INTERVAL_MS) { image.close(); return }
         if (!analyzing.compareAndSet(false, true)) { image.close(); return }
+        lastAnalysisAt = now
         val mediaImage = image.image
         if (mediaImage == null) { analyzing.set(false); image.close(); return }
         detector.process(InputImage.fromMediaImage(mediaImage, image.imageInfo.rotationDegrees))
             .addOnSuccessListener { faces ->
                 present = faces.isNotEmpty()
                 if (present) {
-                    lastPresenceAt = System.currentTimeMillis()
+                    lastPresenceAt = SystemClock.elapsedRealtime()
                     lockedForAbsence = false
                     wakeScreen()
                 }
@@ -95,7 +109,9 @@ class PresenceService : LifecycleService() {
     }
 
     private fun lockIfAbsent() {
-        if (present || lockedForAbsence || System.currentTimeMillis() - lastPresenceAt < 90_000) return
+        val preferences = getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+        if (!preferences.getBoolean(KEY_AUTO_SCREEN_OFF, false)) return
+        if (present || lockedForAbsence || SystemClock.elapsedRealtime() - lastPresenceAt < ABSENCE_TIMEOUT_MS) return
         val policy = getSystemService(DevicePolicyManager::class.java)
         val admin = ComponentName(this, KioskDeviceAdminReceiver::class.java)
         if (policy.isAdminActive(admin)) {
@@ -128,14 +144,23 @@ class PresenceService : LifecycleService() {
     }
 
     private fun createNotificationChannel() {
-        getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL_ID, "Mode kiosque HomeDash", NotificationManager.IMPORTANCE_LOW))
+        getSystemService(NotificationManager::class.java).createNotificationChannel(NotificationChannel(CHANNEL_ID, "Présence HomeDash", NotificationManager.IMPORTANCE_LOW))
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(telemetryTask); detector.close(); executor.shutdownNow(); super.onDestroy()
+        handler.removeCallbacks(maintenanceTask); detector.close(); executor.shutdownNow(); super.onDestroy()
     }
 
     override fun onBind(intent: Intent): IBinder? = super.onBind(intent)
 
-    companion object { private const val CHANNEL_ID = "homedash-presence"; private const val NOTIFICATION_ID = 4100 }
+    companion object {
+        private const val CHANNEL_ID = "homedash-presence"
+        private const val NOTIFICATION_ID = 4100
+        private const val PREFERENCES_NAME = "homedash"
+        private const val KEY_AUTO_SCREEN_OFF = "autoScreenOff"
+        private const val ANALYSIS_INTERVAL_MS = 750L
+        private const val SCREEN_CHECK_INTERVAL_MS = 10_000L
+        private const val TELEMETRY_INTERVAL_MS = 60_000L
+        private const val ABSENCE_TIMEOUT_MS = 90_000L
+    }
 }

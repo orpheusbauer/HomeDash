@@ -1,27 +1,37 @@
 package io.homedash.kiosk
 
 import android.Manifest
+import android.app.ActivityManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.view.Gravity
 import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -33,45 +43,99 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class MainActivity : ComponentActivity() {
-    private val preferences by lazy { getSharedPreferences("homedash", Context.MODE_PRIVATE) }
+    private val preferences by lazy { getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE) }
     private var webView: WebView? = null
-    private var volumeDownCount = 0
-    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startPresenceService()
+    private var deviceAdminRequestPending = false
+    private val cameraPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startPresenceService()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON)
-        enterImmersiveMode()
-        val serverUrl = preferences.getString("serverUrl", null)
+        applySavedOrientation()
+        window.addFlags(
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
+        )
+        leaveLegacyKioskMode()
+        showSystemBars()
+        onBackPressedDispatcher.addCallback(this) { exitToAndroid() }
+
+        val serverUrl = preferences.getString(KEY_SERVER_URL, null)
         if (serverUrl.isNullOrBlank()) showSetup() else showDashboard(serverUrl)
     }
 
     override fun onResume() {
         super.onResume()
-        enterImmersiveMode()
-        val manager = getSystemService(DevicePolicyManager::class.java)
-        if (manager.isDeviceOwnerApp(packageName)) {
-            manager.setLockTaskPackages(ComponentName(this, KioskDeviceAdminReceiver::class.java), arrayOf(packageName))
-            if (!isInLockTaskMode()) startLockTask()
+        leaveLegacyKioskMode()
+        showSystemBars()
+        if (
+            webView != null &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        ) {
+            startPresenceService()
+        }
+        if (deviceAdminRequestPending) {
+            deviceAdminRequestPending = false
+            val enabled = isDeviceAdminActive()
+            preferences.edit().putBoolean(KEY_AUTO_SCREEN_OFF, enabled).apply()
+            Toast.makeText(
+                this,
+                if (enabled) {
+                    "Extinction après absence activée"
+                } else {
+                    "Autorisation non accordée — extinction automatique désactivée"
+                },
+                Toast.LENGTH_LONG,
+            ).show()
+            if (webView == null) showSetup()
         }
     }
 
-    private fun isInLockTaskMode() = getSystemService(android.app.ActivityManager::class.java).lockTaskModeState != android.app.ActivityManager.LOCK_TASK_MODE_NONE
+    override fun onStop() {
+        super.onStop()
+        val screenIsOn = getSystemService(PowerManager::class.java).isInteractive
+        if (!isAutoScreenOffEnabled() || screenIsOn) {
+            stopService(Intent(this, PresenceService::class.java))
+        }
+    }
 
-    private fun enterImmersiveMode() {
-        if (android.os.Build.VERSION.SDK_INT >= 30) {
-            window.insetsController?.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-            window.insetsController?.systemBarsBehavior = android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+    private fun leaveLegacyKioskMode() {
+        val manager = getSystemService(ActivityManager::class.java)
+        if (manager.lockTaskModeState != ActivityManager.LOCK_TASK_MODE_NONE) {
+            runCatching { stopLockTask() }
+        }
+    }
+
+    private fun showSystemBars() {
+        if (Build.VERSION.SDK_INT >= 30) {
+            window.insetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
         } else {
             @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
         }
+    }
+
+    private fun applySavedOrientation() {
+        requestedOrientation =
+            when (preferences.getString(KEY_ORIENTATION, ORIENTATION_LANDSCAPE)) {
+                ORIENTATION_PORTRAIT -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                else -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            }
+    }
+
+    private fun setOrientation(value: String) {
+        val normalized =
+            if (value == ORIENTATION_PORTRAIT) ORIENTATION_PORTRAIT else ORIENTATION_LANDSCAPE
+        preferences.edit().putString(KEY_ORIENTATION, normalized).apply()
+        applySavedOrientation()
     }
 
     private fun showDashboard(serverUrl: String) {
+        val allowedOrigin = Uri.parse(serverUrl)
         val view = WebView(this)
+        webView?.destroy()
         webView = view
         view.settings.javaScriptEnabled = true
         view.settings.domStorageEnabled = true
@@ -80,71 +144,288 @@ class MainActivity : ComponentActivity() {
         view.settings.allowFileAccess = false
         view.settings.allowContentAccess = false
         view.settings.setSupportZoom(false)
+        view.settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)
+        view.addJavascriptInterface(HomeDashBridge(), ANDROID_BRIDGE_NAME)
         view.webChromeClient = WebChromeClient()
-        view.webViewClient = object : WebViewClient() {
-            override fun onReceivedError(v: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                if (request?.isForMainFrame == true) Toast.makeText(this@MainActivity, "HomeDash hors ligne — reconnexion automatique", Toast.LENGTH_LONG).show()
+        view.webViewClient =
+            object : WebViewClient() {
+                override fun shouldOverrideUrlLoading(
+                    webView: WebView?,
+                    request: WebResourceRequest?,
+                ): Boolean {
+                    val target = request?.url ?: return false
+                    val isHomeDash =
+                        target.scheme == allowedOrigin.scheme &&
+                            target.host == allowedOrigin.host &&
+                            effectivePort(target) == effectivePort(allowedOrigin)
+                    if (isHomeDash) return false
+                    runCatching { startActivity(Intent(Intent.ACTION_VIEW, target)) }
+                    return true
+                }
+
+                override fun onReceivedError(
+                    webView: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?,
+                ) {
+                    if (request?.isForMainFrame == true) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            "HomeDash hors ligne — reconnexion automatique",
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        webView?.postDelayed(
+                            {
+                                if (!isFinishing && !isDestroyed) webView?.reload()
+                            },
+                            5_000,
+                        )
+                    }
+                }
             }
-        }
         setContentView(view)
         view.loadUrl(serverUrl)
         requestCameraAndStart()
     }
 
+    private fun effectivePort(uri: Uri): Int =
+        if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80
+
     private fun showSetup() {
+        stopService(Intent(this, PresenceService::class.java))
+        webView?.destroy()
+        webView = null
         val padding = (24 * resources.displayMetrics.density).toInt()
-        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; setPadding(padding, padding, padding, padding) }
-        val title = TextView(this).apply { text = "Configurer HomeDash"; textSize = 26f; gravity = Gravity.CENTER }
-        val url = EditText(this).apply { hint = "Adresse, ex. https://homedash.home.arpa"; setText(preferences.getString("serverUrl", "http://192.168.1.124")); isSingleLine = true }
-        val code = EditText(this).apply { hint = "Code d’association à 6 chiffres"; inputType = 2; isSingleLine = true }
-        val name = EditText(this).apply { hint = "Nom de la tablette"; setText("Tablette murale"); isSingleLine = true }
-        val button = Button(this).apply { text = "Associer et ouvrir" }
-        val help = TextView(this).apply { text = "Créez le code dans HomeDash > Paramètres > Tablettes. Appuyez cinq fois sur Volume bas pour revenir ici."; gravity = Gravity.CENTER }
-        listOf(title, url, code, name, button, help).forEach { layout.addView(it, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { setMargins(0, 8, 0, 8) }) }
+        val layout =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(padding, padding, padding, padding)
+            }
+        val title =
+            TextView(this).apply {
+                text = "Configurer HomeDash"
+                textSize = 26f
+                gravity = Gravity.CENTER
+            }
+        val url =
+            EditText(this).apply {
+                hint = "Adresse, ex. https://192.168.1.124"
+                setText(preferences.getString(KEY_SERVER_URL, "https://192.168.1.124"))
+                isSingleLine = true
+            }
+        val code =
+            EditText(this).apply {
+                hint = "Code d’association à 6 chiffres (première installation)"
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                isSingleLine = true
+            }
+        val name =
+            EditText(this).apply {
+                hint = "Nom de la tablette"
+                setText("Tablette murale")
+                isSingleLine = true
+            }
+        val orientationTitle = TextView(this).apply { text = "Orientation du dashboard" }
+        val orientationGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
+        val landscape = RadioButton(this).apply { text = "Paysage"; id = View.generateViewId() }
+        val portrait = RadioButton(this).apply { text = "Portrait"; id = View.generateViewId() }
+        orientationGroup.addView(landscape)
+        orientationGroup.addView(portrait)
+        orientationGroup.check(
+            if (preferences.getString(KEY_ORIENTATION, ORIENTATION_LANDSCAPE) == ORIENTATION_PORTRAIT) {
+                portrait.id
+            } else {
+                landscape.id
+            },
+        )
+        val button = Button(this).apply { text = "Enregistrer et ouvrir HomeDash" }
+        val autoScreenOffButton =
+            Button(this).apply {
+                text =
+                    if (isAutoScreenOffEnabled()) {
+                        "Désactiver l’extinction après 90 secondes"
+                    } else {
+                        "Activer l’extinction après 90 secondes"
+                    }
+            }
+        val exitButton = Button(this).apply { text = "Retour à Android" }
+        val help =
+            TextView(this).apply {
+                text =
+                    "Le code d’association n’est nécessaire qu’une fois. " +
+                    "L’orientation reste ensuite modifiable dans Paramètres > Affichage tablette. " +
+                    "L’extinction après absence est facultative et ne verrouille jamais HomeDash en mode kiosque."
+                gravity = Gravity.CENTER
+            }
+        listOf(
+            title,
+            url,
+            code,
+            name,
+            orientationTitle,
+            orientationGroup,
+            button,
+            autoScreenOffButton,
+            exitButton,
+            help,
+        ).forEach {
+            layout.addView(
+                it,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { setMargins(0, 8, 0, 8) },
+            )
+        }
         setContentView(layout)
+        exitButton.setOnClickListener { exitToAndroid() }
+        autoScreenOffButton.setOnClickListener {
+            if (isAutoScreenOffEnabled()) {
+                preferences.edit().putBoolean(KEY_AUTO_SCREEN_OFF, false).apply()
+                runCatching {
+                    getSystemService(DevicePolicyManager::class.java).removeActiveAdmin(
+                        ComponentName(this, KioskDeviceAdminReceiver::class.java),
+                    )
+                }
+                showSetup()
+            } else if (isDeviceAdminActive()) {
+                preferences.edit().putBoolean(KEY_AUTO_SCREEN_OFF, true).apply()
+                showSetup()
+            } else {
+                deviceAdminRequestPending = true
+                startActivity(
+                    Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
+                        .putExtra(
+                            DevicePolicyManager.EXTRA_DEVICE_ADMIN,
+                            ComponentName(this, KioskDeviceAdminReceiver::class.java),
+                        ).putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "HomeDash utilise cette autorisation uniquement pour éteindre l’écran après 90 secondes sans présence.",
+                        ),
+                )
+            }
+        }
         button.setOnClickListener {
             val normalized = url.text.toString().trim().trimEnd('/')
             if (normalized.isBlank()) return@setOnClickListener
+            val selectedOrientation =
+                if (orientationGroup.checkedRadioButtonId == portrait.id) {
+                    ORIENTATION_PORTRAIT
+                } else {
+                    ORIENTATION_LANDSCAPE
+                }
             button.isEnabled = false
             lifecycleScope.launch {
                 try {
-                    if (code.text.isNotBlank()) pair(normalized, code.text.toString(), name.text.toString().ifBlank { "Tablette HomeDash" })
-                    preferences.edit().putString("serverUrl", normalized).apply()
+                    if (code.text.isNotBlank()) {
+                        pair(
+                            normalized,
+                            code.text.toString(),
+                            name.text.toString().ifBlank { "Tablette HomeDash" },
+                        )
+                    }
+                    preferences.edit().putString(KEY_SERVER_URL, normalized).apply()
+                    setOrientation(selectedOrientation)
                     showDashboard(normalized)
                 } catch (error: Exception) {
-                    Toast.makeText(this@MainActivity, error.message ?: "Association impossible", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@MainActivity,
+                        error.message ?: "Association impossible",
+                        Toast.LENGTH_LONG,
+                    ).show()
                     button.isEnabled = true
                 }
             }
         }
     }
 
-    private suspend fun pair(serverUrl: String, code: String, name: String) = withContext(Dispatchers.IO) {
+    private suspend fun pair(
+        serverUrl: String,
+        code: String,
+        name: String,
+    ) = withContext(Dispatchers.IO) {
         val connection = URL("$serverUrl/api/v1/devices/pair").openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"; connection.setRequestProperty("Content-Type", "application/json"); connection.doOutput = true
-        connection.outputStream.use { it.write(JSONObject().put("code", code).put("name", name).toString().toByteArray()) }
-        if (connection.responseCode !in 200..299) throw IllegalStateException("Code refusé (${connection.responseCode})")
+        connection.requestMethod = "POST"
+        connection.setRequestProperty("Content-Type", "application/json")
+        connection.doOutput = true
+        connection.outputStream.use {
+            it.write(JSONObject().put("code", code).put("name", name).toString().toByteArray())
+        }
+        if (connection.responseCode !in 200..299) {
+            throw IllegalStateException("Code refusé (${connection.responseCode})")
+        }
         val response = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-        preferences.edit().putString("deviceId", response.getString("deviceId")).putString("deviceToken", response.getString("token")).apply()
+        preferences
+            .edit()
+            .putString("deviceId", response.getString("deviceId"))
+            .putString("deviceToken", response.getString("token"))
+            .apply()
         connection.disconnect()
     }
 
     private fun requestCameraAndStart() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) startPresenceService()
-        else cameraPermission.launch(Manifest.permission.CAMERA)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            startPresenceService()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
+        }
     }
 
     private fun startPresenceService() {
         ContextCompat.startForegroundService(this, Intent(this, PresenceService::class.java))
     }
 
-    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (keyCode == android.view.KeyEvent.KEYCODE_VOLUME_DOWN) {
-            volumeDownCount += 1
-            if (volumeDownCount >= 5) { volumeDownCount = 0; showSetup(); return true }
-        } else volumeDownCount = 0
-        return super.onKeyDown(keyCode, event)
+    private fun isDeviceAdminActive(): Boolean =
+        getSystemService(DevicePolicyManager::class.java).isAdminActive(
+            ComponentName(this, KioskDeviceAdminReceiver::class.java),
+        )
+
+    private fun isAutoScreenOffEnabled(): Boolean =
+        preferences.getBoolean(KEY_AUTO_SCREEN_OFF, false) && isDeviceAdminActive()
+
+    private fun exitToAndroid() {
+        stopService(Intent(this, PresenceService::class.java))
+        leaveLegacyKioskMode()
+        showSystemBars()
+        moveTaskToBack(true)
     }
 
-    override fun onDestroy() { webView?.destroy(); super.onDestroy() }
+    private inner class HomeDashBridge {
+        @JavascriptInterface
+        fun getOrientation(): String =
+            preferences.getString(KEY_ORIENTATION, ORIENTATION_LANDSCAPE) ?: ORIENTATION_LANDSCAPE
+
+        @JavascriptInterface
+        fun setOrientation(value: String) {
+            runOnUiThread { this@MainActivity.setOrientation(value) }
+        }
+
+        @JavascriptInterface
+        fun openAppSettings() {
+            runOnUiThread { showSetup() }
+        }
+
+        @JavascriptInterface
+        fun exitToAndroid() {
+            runOnUiThread { this@MainActivity.exitToAndroid() }
+        }
+    }
+
+    override fun onDestroy() {
+        webView?.removeJavascriptInterface(ANDROID_BRIDGE_NAME)
+        webView?.destroy()
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val PREFERENCES_NAME = "homedash"
+        private const val KEY_SERVER_URL = "serverUrl"
+        private const val KEY_ORIENTATION = "orientation"
+        private const val KEY_AUTO_SCREEN_OFF = "autoScreenOff"
+        private const val ORIENTATION_LANDSCAPE = "landscape"
+        private const val ORIENTATION_PORTRAIT = "portrait"
+        private const val ANDROID_BRIDGE_NAME = "HomeDashAndroid"
+    }
 }

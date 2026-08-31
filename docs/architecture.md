@@ -90,9 +90,9 @@ Les mises à jour arrêtent le processus avant la sauvegarde afin de produire un
 ## Releases atomiques
 
 ```text
-/opt/homedash/releases/0.1.2
 /opt/homedash/releases/0.2.0
-/opt/homedash/current -> /opt/homedash/releases/0.2.0
+/opt/homedash/releases/0.3.0
+/opt/homedash/current -> /opt/homedash/releases/0.3.0
 ```
 
 L’updater SSH télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.

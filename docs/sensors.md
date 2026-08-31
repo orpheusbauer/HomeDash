@@ -70,7 +70,7 @@ Un capteur reçu est `online`. La prochaine étape de stabilisation doit ajouter
 
 ## MQTT et ESPHome
 
-MQTT n’est volontairement pas requis dans `0.1.2`. HTTP est suffisant pour quelques sondes envoyant une mesure par minute et évite Mosquitto, ACL et un second protocole temps réel.
+MQTT n’est volontairement pas requis dans `0.2.0`. HTTP est suffisant pour quelques sondes envoyant une mesure par minute et évite Mosquitto, ACL et un second protocole temps réel.
 
 Ajoutez MQTT lorsque vous aurez beaucoup de capteurs ou besoin de commandes bidirectionnelles : Mosquitto local, TLS ou VLAN, identifiants par appareil, topics `homedash/sensors/{id}/state`, adaptateur backend transformant le message vers le même modèle `Sensor`. L’UI et la base ne doivent pas connaître la source.
 

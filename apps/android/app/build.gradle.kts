@@ -3,6 +3,18 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val releaseKeystoreFile = System.getenv("HOMEDASH_ANDROID_KEYSTORE_FILE")
+val releaseKeystorePassword = System.getenv("HOMEDASH_ANDROID_KEYSTORE_PASSWORD")
+val releaseKeyAlias = System.getenv("HOMEDASH_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("HOMEDASH_ANDROID_KEY_PASSWORD")
+val hasReleaseSigning =
+    listOf(
+        releaseKeystoreFile,
+        releaseKeystorePassword,
+        releaseKeyAlias,
+        releaseKeyPassword,
+    ).all { !it.isNullOrBlank() }
+
 android {
     namespace = "io.homedash.kiosk"
     compileSdk = 35
@@ -11,13 +23,24 @@ android {
         applicationId = "io.homedash.kiosk"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.2.0"
     }
     buildFeatures { buildConfig = true }
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseKeystoreFile!!)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

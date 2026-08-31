@@ -1,6 +1,6 @@
 {
   "name": "@homedash/server",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "main": "dist/index.js",
@@ -18,7 +18,7 @@
     "@fastify/rate-limit": "latest",
     "@fastify/static": "latest",
     "@fastify/websocket": "latest",
-    "@homedash/contracts": "0.1.2",
+    "@homedash/contracts": "0.2.0",
     "drizzle-orm": "latest",
     "fastify": "latest",
     "pino-pretty": "latest",
