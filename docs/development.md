@@ -83,8 +83,8 @@ Le build Android est aussi exécuté par GitHub Actions, car le poste actuel peu
 Après `npm run build`, Linux ou Git Bash peut reproduire l’asset de release :
 
 ```bash
-bash deployment/raspberry-pi-zero/package-native.sh 0.2.0 output
-sha256sum --check output/homedash-native-0.2.0.tar.gz.sha256
+bash deployment/raspberry-pi-zero/package-native.sh 0.2.1 output
+sha256sum --check output/homedash-native-0.2.1.tar.gz.sha256
 ```
 
 L’archive contient les trois dossiers `dist` et les manifests nécessaires à `npm ci --omit=dev`. Elle ne contient ni `node_modules`, ni secrets, ni données. Ne lancez pas la chaîne de build sur le Zero ARMv6.

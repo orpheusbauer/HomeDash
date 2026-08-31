@@ -343,7 +343,6 @@ button {
 }
 
 .grid-stack-item-content.widget-card {
-  inset: 0 !important;
   display: flex;
   flex-direction: column;
   overflow: hidden;

@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly MOUNT_POINT="${HOMEDASH_DISK_MOUNT_POINT:-/}"
+readonly STATE_FILE="${HOMEDASH_DISK_GUARD_STATE_FILE:-/run/homedash-disk-guard.state}"
+readonly REMINDER_RUNS=12
+
+usage_percent="$(LC_ALL=C df -P "${MOUNT_POINT}" | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+inode_percent="$(LC_ALL=C df -Pi "${MOUNT_POINT}" | awk 'NR == 2 {gsub(/%/, "", $5); print $5}')"
+if [[ ! "${usage_percent}" =~ ^[0-9]+$ || ! "${inode_percent}" =~ ^[0-9]+$ ]]; then
+  logger -p daemon.err -t homedash-disk-guard \
+    "Impossible de lire l'utilisation du filesystem ${MOUNT_POINT}."
+  exit 1
+fi
+
+level="ok"
+priority="daemon.info"
+if (( usage_percent >= 95 )); then
+  level="critical"
+  priority="daemon.crit"
+elif (( usage_percent >= 90 )); then
+  level="error"
+  priority="daemon.err"
+elif (( usage_percent >= 80 )); then
+  level="warning"
+  priority="daemon.warning"
+fi
+
+if (( inode_percent >= 95 )) && [[ "${level}" != "critical" ]]; then
+  level="critical"
+  priority="daemon.crit"
+elif (( inode_percent >= 90 )) && [[ "${level}" == "ok" || "${level}" == "warning" ]]; then
+  level="error"
+  priority="daemon.err"
+elif (( inode_percent >= 80 )) && [[ "${level}" == "ok" ]]; then
+  level="warning"
+  priority="daemon.warning"
+fi
+
+previous_level="unknown"
+same_level_runs=0
+if [[ -r "${STATE_FILE}" ]]; then
+  read -r previous_level same_level_runs < "${STATE_FILE}" || true
+fi
+if [[ "${level}" == "${previous_level}" ]]; then
+  same_level_runs=$((same_level_runs + 1))
+else
+  same_level_runs=0
+fi
+printf '%s %s\n' "${level}" "${same_level_runs}" > "${STATE_FILE}.tmp"
+mv -f "${STATE_FILE}.tmp" "${STATE_FILE}"
+
+root_core_count="$(find / -maxdepth 1 -type f \( -name core -o -name 'core.*' \) \
+  -printf '.' 2>/dev/null | wc -c)"
+
+should_log=false
+if [[ "${level}" != "${previous_level}" ]]; then
+  should_log=true
+elif [[ "${level}" != "ok" ]] && (( same_level_runs % REMINDER_RUNS == 0 )); then
+  should_log=true
+fi
+
+if [[ "${should_log}" == "true" ]]; then
+  logger -p "${priority}" -t homedash-disk-guard \
+    "Niveau=${level}; montage=${MOUNT_POINT}; blocs=${usage_percent}%; inodes=${inode_percent}%."
+fi
+
+if (( root_core_count > 0 )); then
+  logger -p daemon.crit -t homedash-disk-guard \
+    "${root_core_count} core dump(s) détecté(s) directement sous /; diagnostic immédiat requis."
+fi

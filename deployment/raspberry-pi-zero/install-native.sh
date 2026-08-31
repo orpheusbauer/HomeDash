@@ -10,6 +10,10 @@ readonly TAG="$1"
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly DEPLOYMENT_DIRECTORY="${PROJECT_ROOT}/deployment/raspberry-pi-zero"
 
+# Aucun programme lancé par l'installeur ne doit pouvoir remplir la carte SD en
+# cas de défaut natif. La politique persistante est installée plus bas.
+ulimit -c 0 || true
+
 if [[ "$(uname -m)" != "armv6l" || "$(getconf LONG_BIT)" != "32" ]]; then
   echo "Cette installation exige un Raspberry Pi Zero/Zero W original, armv6l 32 bits." >&2
   echo "Détecté: $(uname -m), $(getconf LONG_BIT) bits." >&2
@@ -20,8 +24,20 @@ if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   exit 1
 fi
 
+# Les versions Docker installaient un agent séparé qui utilisait /usr/bin/node,
+# n'avait pas de WorkingDirectory et redémarrait toutes les cinq secondes. Il
+# n'a aucun rôle dans le déploiement ARMv6 natif et doit être retiré avant toute
+# autre opération pour arrêter une éventuelle boucle de crash.
+legacy_updater_found=false
+if systemctl cat homedash-updater.service >/dev/null 2>&1 \
+  || [[ -e /etc/systemd/system/homedash-updater.service ]]; then
+  legacy_updater_found=true
+  systemctl disable --now homedash-updater.service 2>/dev/null || true
+  rm -f -- /etc/systemd/system/homedash-updater.service
+fi
+
 apt-get update
-apt-get install -y ca-certificates curl git jq nginx openssl xz-utils
+apt-get install -y ca-certificates curl file git jq nginx openssl procps xz-utils
 
 bash "${DEPLOYMENT_DIRECTORY}/install-node-armv6.sh"
 
@@ -32,9 +48,16 @@ id homedash >/dev/null 2>&1 || useradd --system --gid homedash \
 install -d -o root -g root -m 0755 /opt/homedash /opt/homedash/releases
 install -d -o homedash -g homedash -m 0750 /var/lib/homedash /var/lib/homedash/data /var/lib/homedash/data/backups
 install -d -o root -g homedash -m 0750 /etc/homedash
+install -d -o root -g root -m 0755 /etc/sysctl.d /etc/systemd/journald.conf.d
 
 install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/update-native.sh" /usr/local/sbin/homedash-update-native
+install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard" /usr/local/sbin/homedash-disk-guard
 install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-zero.service" /etc/systemd/system/homedash.service
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard.service" /etc/systemd/system/homedash-disk-guard.service
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard.timer" /etc/systemd/system/homedash-disk-guard.timer
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/60-homedash-core-dumps.conf" /etc/sysctl.d/60-homedash-core-dumps.conf
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/60-homedash-journal.conf" /etc/systemd/journald.conf.d/60-homedash-journal.conf
+sysctl --load /etc/sysctl.d/60-homedash-core-dumps.conf >/dev/null
 
 ip_address="${HOMEDASH_IP_ADDRESS:-$(ip -4 route get 1.1.1.1 | awk '{for (i=1; i<=NF; i++) if ($i == "src") {print $(i+1); exit}}')}"
 host_name="${HOMEDASH_HOSTNAME:-$(hostname).local}"
@@ -87,7 +110,11 @@ fi
 nginx -t
 
 systemctl daemon-reload
-systemctl enable nginx.service homedash.service
+systemctl reset-failed homedash.service 2>/dev/null || true
+systemctl enable nginx.service homedash.service homedash-disk-guard.timer
+systemctl restart systemd-journald.service
+systemctl start homedash-disk-guard.service
+systemctl start homedash-disk-guard.timer
 systemctl restart nginx.service
 /usr/local/sbin/homedash-update-native "${TAG}"
 
@@ -96,3 +123,14 @@ echo "Installation terminée."
 echo "Interface: https://${ip_address} ou https://${host_name}"
 echo "CA à copier sur la tablette: /var/lib/homedash/tls/root-ca.crt"
 echo "Diagnostic: sudo systemctl status homedash nginx --no-pager"
+echo "Surveillance disque: sudo systemctl status homedash-disk-guard.timer --no-pager"
+if [[ "${legacy_updater_found}" == "true" ]]; then
+  echo "Ancien service Docker homedash-updater désactivé et retiré."
+fi
+
+root_core_count="$(find / -maxdepth 1 -type f \( -name core -o -name 'core.*' \) \
+  -printf '.' 2>/dev/null | wc -c)"
+if (( root_core_count > 0 )); then
+  echo "ATTENTION: ${root_core_count} ancien(s) core dump(s) subsistent sous /."
+  echo "Analysez-en au plus un, puis supprimez uniquement /core et /core.* après vérification."
+fi

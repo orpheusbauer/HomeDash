@@ -13,6 +13,19 @@ if [[ "${EUID}" -ne 0 || "$#" -ne 1 ]]; then
   exit 1
 fi
 
+# Les commandes Node/npm de l'update ne doivent jamais produire de dump natif
+# persistant. L'unité applicative applique également LimitCORE=0.
+ulimit -c 0 || true
+
+# Migration de sécurité pour les installations passées de Docker au mode natif.
+# Cet agent historique n'est jamais utilisé par update-native.sh.
+if systemctl cat homedash-updater.service >/dev/null 2>&1 \
+  || [[ -e /etc/systemd/system/homedash-updater.service ]]; then
+  systemctl disable --now homedash-updater.service 2>/dev/null || true
+  rm -f -- /etc/systemd/system/homedash-updater.service
+  systemctl daemon-reload
+fi
+
 readonly TAG="$1"
 if [[ ! "${TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "Tag invalide: ${TAG}. Format attendu: vX.Y.Z" >&2
@@ -123,6 +136,7 @@ if [[ -L "${CURRENT_LINK}" ]]; then
   previous_release="$(readlink -f "${CURRENT_LINK}")"
 fi
 if [[ "${previous_release}" == "${RELEASE_DIRECTORY}" ]]; then
+  systemctl reset-failed homedash.service 2>/dev/null || true
   systemctl restart homedash.service
   echo "HomeDash ${VERSION_VALUE} était déjà actif; service redémarré."
   exit 0
@@ -137,6 +151,7 @@ chmod 0600 "${backup_file}"
 next_link="/opt/homedash/.current-$$"
 ln -s "${RELEASE_DIRECTORY}" "${next_link}"
 mv -Tf "${next_link}" "${CURRENT_LINK}"
+systemctl reset-failed homedash.service 2>/dev/null || true
 systemctl start homedash.service
 
 healthy=false
@@ -158,6 +173,7 @@ if [[ "${healthy}" != "true" ]]; then
     rollback_link="/opt/homedash/.current-rollback-$$"
     ln -s "${previous_release}" "${rollback_link}"
     mv -Tf "${rollback_link}" "${CURRENT_LINK}"
+    systemctl reset-failed homedash.service 2>/dev/null || true
     systemctl start homedash.service
   fi
   journalctl -u homedash.service -n 80 --no-pager >&2 || true

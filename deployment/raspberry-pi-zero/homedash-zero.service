@@ -3,6 +3,8 @@ Description=HomeDash native service for Raspberry Pi Zero
 After=network-online.target
 Wants=network-online.target
 ConditionPathExists=/opt/homedash/current/apps/server/dist/index.js
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
@@ -14,9 +16,15 @@ Environment=NODE_ENV=production
 Environment=NODE_OPTIONS=--max-old-space-size=192
 ExecStart=/usr/local/bin/node apps/server/dist/index.js
 Restart=on-failure
-RestartSec=8
+RestartSec=15
 TimeoutStopSec=30
 KillSignal=SIGTERM
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homedash
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=100
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict

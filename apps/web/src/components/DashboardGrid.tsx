@@ -45,7 +45,7 @@ export function DashboardGrid({
           layout: 'moveScale',
         },
         cellHeight: 86,
-        margin: 10,
+        margin: 8,
         float: true,
         animate: true,
         staticGrid: !editing,

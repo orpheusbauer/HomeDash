@@ -9,12 +9,10 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.view.Gravity
 import android.view.View
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
@@ -34,6 +32,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -46,6 +47,7 @@ class MainActivity : ComponentActivity() {
     private val preferences by lazy { getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE) }
     private var webView: WebView? = null
     private var deviceAdminRequestPending = false
+    private var exitingToAndroid = false
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) startPresenceService()
@@ -59,7 +61,7 @@ class MainActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
         )
         leaveLegacyKioskMode()
-        showSystemBars()
+        hideSystemBars()
         onBackPressedDispatcher.addCallback(this) { exitToAndroid() }
 
         val serverUrl = preferences.getString(KEY_SERVER_URL, null)
@@ -68,8 +70,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        exitingToAndroid = false
         leaveLegacyKioskMode()
-        showSystemBars()
+        hideSystemBars()
         if (
             webView != null &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -108,12 +111,25 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus && !exitingToAndroid) hideSystemBars()
+    }
+
+    private fun hideSystemBars() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+    }
+
     private fun showSystemBars() {
-        if (Build.VERSION.SDK_INT >= 30) {
-            window.insetsController?.show(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_VISIBLE
+        WindowCompat.setDecorFitsSystemWindows(window, true)
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            show(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
         }
     }
 
@@ -185,6 +201,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         setContentView(view)
+        hideSystemBars()
         view.loadUrl(serverUrl)
         requestCameraAndStart()
     }
@@ -280,6 +297,7 @@ class MainActivity : ComponentActivity() {
             )
         }
         setContentView(layout)
+        hideSystemBars()
         exitButton.setOnClickListener { exitToAndroid() }
         autoScreenOffButton.setOnClickListener {
             if (isAutoScreenOffEnabled()) {
@@ -386,6 +404,7 @@ class MainActivity : ComponentActivity() {
         preferences.getBoolean(KEY_AUTO_SCREEN_OFF, false) && isDeviceAdminActive()
 
     private fun exitToAndroid() {
+        exitingToAndroid = true
         stopService(Intent(this, PresenceService::class.java))
         leaveLegacyKioskMode()
         showSystemBars()

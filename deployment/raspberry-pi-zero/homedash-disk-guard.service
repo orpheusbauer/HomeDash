@@ -1,0 +1,17 @@
+[Unit]
+Description=HomeDash disk usage guard
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/homedash-disk-guard
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+ReadWritePaths=/run

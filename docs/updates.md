@@ -33,21 +33,21 @@ git status --short
 Committez puis poussez `main`. Attendez une CI entièrement verte. Créez seulement ensuite le tag :
 
 ```powershell
-git tag -a v0.2.0 -m "HomeDash 0.2.0"
-git push origin v0.2.0
+git tag -a v0.2.1 -m "HomeDash 0.2.1"
+git push origin v0.2.1
 ```
 
-Ne réutilisez et ne déplacez jamais un tag publié. Une correction de `v0.2.0` devient `v0.2.1`.
+Ne réutilisez et ne déplacez jamais un tag publié. Cette correction de `v0.2.0` est donc publiée sous `v0.2.1`.
 
 ## 3. Vérifier la release dans GitHub
 
-Dans **Actions > Release**, attendez le vert. Dans **Releases > v0.2.0**, vérifiez :
+Dans **Actions > Release**, attendez le vert. Dans **Releases > v0.2.1**, vérifiez :
 
 ```text
-homedash-native-0.2.0.tar.gz
-homedash-native-0.2.0.tar.gz.sha256
-homedash-kiosk-0.2.0.apk
-homedash-kiosk-0.2.0.apk.sha256
+homedash-native-0.2.1.tar.gz
+homedash-native-0.2.1.tar.gz.sha256
+homedash-kiosk-0.2.1.apk
+homedash-kiosk-0.2.1.apk.sha256
 ```
 
 L’absence du SHA-256 interdit l’installation automatique. Ne fabriquez pas ce fichier manuellement après coup : corrigez le workflow et créez une nouvelle version.
@@ -58,7 +58,7 @@ L’absence du SHA-256 interdit l’installation automatique. Ne fabriquez pas c
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.2.0
+git checkout v0.2.1
 ```
 
 Le statut doit être propre. Le clone ne sert pas à compiler ; il apporte les nouveaux scripts de déploiement et la documentation correspondant au tag.
@@ -75,15 +75,15 @@ Si la release modifie l’unité `systemd` ou Nginx, relancez plutôt l’instal
 
 ```bash
 sudo env HOMEDASH_HOSTNAME=homedash.local HOMEDASH_IP_ADDRESS=192.168.1.124 \
-  bash deployment/raspberry-pi-zero/install-native.sh v0.2.0
+  bash deployment/raspberry-pi-zero/install-native.sh v0.2.1
 ```
 
-Le fichier `/etc/homedash/homedash.env` et l’autorité de certification existants ne sont pas remplacés.
+Cette relance complète est **obligatoire pour `v0.2.1`** : elle installe les limites de redémarrage, la politique de core dumps, la rotation du journal, le contrôle disque et retire l’ancien agent Docker. Le fichier `/etc/homedash/homedash.env` et l’autorité de certification existants ne sont pas remplacés.
 
 ## 5. Installation normale d’une release
 
 ```bash
-sudo homedash-update-native v0.2.0
+sudo homedash-update-native v0.2.1
 ```
 
 Le script :
@@ -92,7 +92,7 @@ Le script :
 2. utilise `/etc/homedash/github-token` si le dépôt est privé ;
 3. télécharge l’archive et le SHA-256 via l’API GitHub ;
 4. vérifie le hash et refuse les chemins d’archive dangereux ;
-5. installe dans `/opt/homedash/releases/0.2.0` ;
+5. installe dans `/opt/homedash/releases/0.2.1` ;
 6. lance `npm ci --omit=dev --ignore-scripts` avec un seul job et une limite mémoire ;
 7. arrête brièvement HomeDash ;
 8. sauvegarde les données dans `/var/lib/homedash/data/backups` ;

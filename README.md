@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.2.0` fournit déjà :
+La version `0.2.1` fournit déjà :
 
 - une grille tactile responsive avec déplacement, redimensionnement, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -13,7 +13,7 @@ La version `0.2.0` fournit déjà :
 - WebSocket pour les changements de dashboard, métriques et capteurs ;
 - SQLite local, migrations, sauvegardes cohérentes et cache hors ligne ;
 - authentification locale des opérations administratives et association à usage unique des tablettes ;
-- application Android 10+ murale, APK signée, démarrage au boot, sortie simple vers Android, orientations portrait/paysage, télémétrie et détection locale de visage comme signal de présence — aucune reconnaissance ;
+- application Android 10+ murale, APK signée, démarrage au boot, plein écran immersif avec navigation rappelable par geste, sortie simple vers Android, orientations portrait/paysage, télémétrie et détection locale de visage comme signal de présence — aucune reconnaissance ;
 - déploiement natif ARMv6 sans Docker, Nginx HTTPS local, `systemd`, releases précompilées, sauvegarde, health check et rollback ;
 - CI GitHub, tests TypeScript, archive native et Release Android signée.
 
@@ -49,6 +49,7 @@ npm run build
 - [Google Calendar OAuth](docs/google-calendar.md)
 - [Capteurs HTTP et ESP32](docs/sensors.md)
 - [Mises à jour et releases](docs/updates.md)
+- [Diagnostic des crash loops et core dumps](docs/crash-loop-recovery.md)
 - [Sauvegarde et restauration](docs/backup-and-restore.md)
 - [Créer un widget](docs/creating-a-widget.md)
 - [Architecture et sécurité](docs/architecture.md)

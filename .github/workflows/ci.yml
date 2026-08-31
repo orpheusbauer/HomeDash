@@ -23,6 +23,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Verify Raspberry Pi deployment safeguards
+        run: bash deployment/raspberry-pi-zero/test-deployment.sh
       - name: Verify native release packaging
         run: |
           bash deployment/raspberry-pi-zero/package-native.sh 0.0.0 "$RUNNER_TEMP/native-package"

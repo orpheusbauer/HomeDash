@@ -11,6 +11,11 @@ if [[ "${PROJECT_ROOT}" != "/opt/homedash" ]]; then
   echo "Le dépôt doit être installé dans /opt/homedash (actuel: ${PROJECT_ROOT})." >&2
   exit 1
 fi
+if [[ "$(uname -m)" == "armv6l" ]]; then
+  echo "Le déploiement Docker est incompatible avec le Raspberry Pi Zero ARMv6." >&2
+  echo "Utilisez deployment/raspberry-pi-zero/install-native.sh." >&2
+  exit 1
+fi
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker manque. Suivez docs/installation-raspberry-pi.md avant de continuer." >&2
   exit 1
