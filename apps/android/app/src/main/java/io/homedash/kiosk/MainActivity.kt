@@ -33,6 +33,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.MainThread
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowCompat
@@ -40,12 +41,10 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
@@ -596,7 +595,10 @@ class MainActivity : ComponentActivity() {
         Toast.makeText(this, "Téléchargement de HomeDash $version…", Toast.LENGTH_LONG).show()
         lifecycleScope.launch {
             try {
-                val apk = downloadUpdateWithRetry(version)
+                val apk = downloadUpdateWithRetry(
+                    serverOrigin = { activeServerOrigin() },
+                    download = { origin -> downloadUpdate(version, origin) },
+                )
                 if (packageManager.canRequestPackageInstalls()) {
                     clearPendingUpdate()
                     launchUpdateInstaller(apk)
@@ -659,27 +661,7 @@ class MainActivity : ComponentActivity() {
         startActivity(intent)
     }
 
-    private suspend fun downloadUpdateWithRetry(version: String): File {
-        var lastNetworkError: IOException? = null
-        repeat(UPDATE_DOWNLOAD_ATTEMPTS) { attempt ->
-            try {
-                return withContext(Dispatchers.IO) { downloadUpdate(version) }
-            } catch (error: IOException) {
-                lastNetworkError = error
-                if (attempt + 1 < UPDATE_DOWNLOAD_ATTEMPTS) {
-                    delay(UPDATE_RETRY_DELAYS_MS[attempt])
-                }
-            }
-        }
-        throw IllegalStateException(
-            "Connexion au Raspberry Pi impossible après $UPDATE_DOWNLOAD_ATTEMPTS tentatives. " +
-                "Vérifiez le Wi-Fi et l’adresse du serveur, puis réessayez.",
-            lastNetworkError,
-        )
-    }
-
-    private fun downloadUpdate(version: String): File {
-        val serverUrl = activeServerOrigin()
+    private fun downloadUpdate(version: String, serverUrl: String): File {
         val deviceId = preferences.getString(KEY_DEVICE_ID, null) ?: error("Tablette non associée")
         val token = preferences.getString(KEY_DEVICE_TOKEN, null) ?: error("Tablette non associée")
         val connection =
@@ -736,6 +718,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @MainThread
     private fun activeServerOrigin(): String {
         val candidates =
             listOfNotNull(
@@ -852,8 +835,6 @@ class MainActivity : ComponentActivity() {
         private const val ORIENTATION_PORTRAIT = "portrait"
         private const val ANDROID_BRIDGE_NAME = "HomeDashAndroid"
         private const val MAX_APK_BYTES = 100L * 1024L * 1024L
-        private const val UPDATE_DOWNLOAD_ATTEMPTS = 3
-        private val UPDATE_RETRY_DELAYS_MS = longArrayOf(1_000L, 3_000L)
         private val VERSION_PATTERN = Regex("^\\d+\\.\\d+\\.\\d+$")
         private val SHA256_PATTERN = Regex("^[a-f0-9]{64}$")
     }

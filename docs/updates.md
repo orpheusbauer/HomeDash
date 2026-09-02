@@ -6,7 +6,9 @@ La version `0.4.0` constitue une transition : son installeur ajoute au Raspberry
 
 La version `0.4.2` corrige le premier passage par l’autorisation Android « Installer des applications inconnues ». L’APK est désormais téléchargée et vérifiée avant d’ouvrir ce réglage, puis reprise depuis le cache privé au retour dans HomeDash. Trois tentatives sont effectuées en cas de coupure réseau transitoire et l’interface affiche chaque étape.
 
-La version `0.4.3` corrige la disposition tactile et le service caméra et active les **mises à jour automatiques du serveur Pi**. Si l’agent natif 0.4.0 ou ultérieur fonctionne déjà, installez le serveur 0.4.3 une fois depuis les paramètres de la tablette, puis l’APK 0.4.3. **Aucun nouvel installeur complet ni SSH n’est nécessaire pour cette transition.** La boucle automatique sera ensuite active pour les releases suivantes.
+La version `0.4.3` corrige la disposition tactile et le service caméra et active les **mises à jour automatiques du serveur Pi**. Si l’agent natif 0.4.0 ou ultérieur fonctionne déjà, installez le serveur actuel une fois depuis les paramètres de la tablette. **Aucun nouvel installeur complet ni SSH n’est nécessaire pour cette transition du serveur.** La boucle automatique sera ensuite active pour les releases suivantes. Pour l’APK, utilisez désormais la version 0.4.4 et la procédure ci-dessous si le téléchargement intégré échoue.
+
+La version `0.4.4` corrige l’erreur **A WebView method was called on thread 'DefaultDispatcher-worker-…'** de l’installateur Android : l’adresse affichée par la WebView est maintenant lue sur le thread principal, avant le téléchargement en arrière-plan. Les nouvelles tentatives réutilisent cette même adresse. **Si cette erreur apparaît dans l’APK déjà installée, installez manuellement l’APK signée 0.4.4 une fois**, selon la procédure de dépannage ci-dessous ; une mise à jour du serveur ne peut pas corriger le code natif de l’ancienne APK.
 
 ## Vue d’ensemble
 
@@ -49,7 +51,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.3` et `versionCode = 10`.
+Pour la présente release, les valeurs attendues sont `0.4.4` et `versionCode = 11`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -84,7 +86,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.3: grille stable, caméra et mises à jour automatiques"
+git commit -m "Release 0.4.4: correction du thread WebView de l’installateur Android"
 git push origin main
 ```
 
@@ -109,8 +111,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.3 -m "HomeDash 0.4.3"
-git push origin v0.4.3
+git tag -a v0.4.4 -m "HomeDash 0.4.4"
+git push origin v0.4.4
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -126,13 +128,13 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.3**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.4**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.3.tar.gz
-homedash-native-0.4.3.tar.gz.sha256
-homedash-kiosk-0.4.3.apk
-homedash-kiosk-0.4.3.apk.sha256
+homedash-native-0.4.4.tar.gz
+homedash-native-0.4.4.tar.gz.sha256
+homedash-kiosk-0.4.4.apk
+homedash-kiosk-0.4.4.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
@@ -244,6 +246,21 @@ sudo bash deployment/raspberry-pi-zero/install-native.sh vX.Y.Z
 Ce garde-fou empêche l’agent privilégié de modifier son propre périmètre ou d’exécuter des commandes arbitraires depuis l’interface Web.
 
 ## Dépannage
+
+### Erreur rouge « A WebView method was called on thread … » pendant la mise à jour APK
+
+Ce défaut vient du code Android déjà installé : il lit `webView.url` depuis `Dispatchers.IO`. Même un accès en lecture à la WebView doit se faire sur son thread principal. Ajouter des permissions ou réinstaller le serveur ne répare pas cette erreur.
+
+Après publication de la release `v0.4.4` :
+
+1. laissez le Pi installer le serveur 0.4.4, ou lancez sa mise à jour depuis les paramètres ;
+2. sur la tablette, ouvrez **Chrome**, puis la page **Releases** du dépôt HomeDash sur GitHub (connectez-vous si le dépôt est privé) ;
+3. téléchargez **homedash-kiosk-0.4.4.apk**, l’APK signée publiée par le workflow, pas `app-debug.apk` ; vous pouvez aussi copier ce même fichier depuis le PC par USB ;
+4. ouvrez l’APK téléchargée et autorisez temporairement le navigateur ou le gestionnaire de fichiers à installer cette source si Android le demande ;
+5. choisissez **Mettre à jour**, **sans désinstaller HomeDash** : avec la même signature et le code de version supérieur, l’adresse du Pi, l’association et les réglages sont conservés ;
+6. rouvrez HomeDash et vérifiez **Application tablette 0.4.4**. Les mises à jour suivantes pourront à nouveau utiliser le bouton intégré.
+
+L’ancienne application ne peut pas installer elle-même ce correctif si son téléchargement échoue avant de recevoir l’APK. L’installation manuelle est donc nécessaire une seule fois pour sortir de cette situation. Ne modifiez pas le tag 0.4.3 déjà publié.
 
 ### Le bouton serveur n’apparaît pas
 
