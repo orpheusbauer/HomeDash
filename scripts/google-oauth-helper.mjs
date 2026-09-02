@@ -61,7 +61,8 @@ server.listen(0, '127.0.0.1', () => {
     client_id: client.client_id,
     redirect_uri: redirectUri,
     response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/calendar',
+    scope:
+      'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.calendarlist.readonly',
     access_type: 'offline',
     prompt: 'consent',
     state,

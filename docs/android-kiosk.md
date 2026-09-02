@@ -223,9 +223,9 @@ HomeDash n’est pas ouvert à partir des fichiers présents sur le PC. Le navig
 **[PI — terminal SSH]** Préparez une copie du certificat public, puis quittez SSH :
 
 ```bash
-cp /var/lib/homedash/tls/root-ca.crt "$HOME/homedash-root-ca.crt"
+sudo cp /var/lib/homedash/tls/root-ca.crt "$HOME/homedash-root-ca.crt"
 sudo chown "$USER:$USER" "$HOME/homedash-root-ca.crt"
-chmod 0644 "$HOME/homedash-root-ca.crt"
+sudo chmod 0644 "$HOME/homedash-root-ca.crt"
 exit
 ```
 
@@ -321,13 +321,13 @@ Sur la tablette :
 
 Android tourne immédiatement l’activité. HomeDash applique automatiquement :
 
-- 12 colonnes en grand paysage ;
-- 6 colonnes en portrait de tablette ;
+- 48 colonnes en grand paysage pour un redimensionnement fin ;
+- 24 colonnes en portrait de tablette ;
 - une seule colonne sur un écran très étroit ;
 - une barre supérieure sur une seule rangée, avec l’onglet Accueil immédiatement à droite du logo ;
 - des cartes, marges, titres et onglets adaptés à la largeur disponible.
 
-La transformation responsive n’écrase pas la disposition 12 colonnes enregistrée tant que le mode édition n’est pas activé.
+La transformation responsive n’écrase pas la disposition 48 colonnes enregistrée tant que le mode édition n’est pas activé.
 
 ## 8. Configurer la veille et le verrouillage de l’écran
 
@@ -419,19 +419,19 @@ Ne collez pas définitivement la tablette avant d’avoir validé le bouton **An
 
 ## 12. Mise à jour future directement depuis HomeDash
 
-Après l’installation manuelle unique de `0.3.0`, ne retournez plus dans GitHub depuis la tablette et ne réinstallez plus le certificat. Pour chaque nouvelle version :
+Après l’installation manuelle unique de l’APK `0.3.0` et l’installation complète du serveur `0.4.0`, ne retournez plus dans GitHub depuis la tablette et ne réinstallez plus le certificat. Pour chaque nouvelle version applicative :
 
 1. développez et poussez depuis le PC ;
 2. attendez la CI verte ;
 3. créez un nouveau tag ;
 4. attendez la Release signée ;
-5. mettez d’abord le serveur du Pi à jour avec `sudo homedash-update-native vX.Y.Z` ;
-6. sur la tablette, ouvrez **HomeDash > Paramètres**, puis saisissez le PIN administrateur ;
-7. dans **Mises à jour**, touchez **Vérifier** ;
-8. touchez **Installer l’application X.Y.Z** ;
+5. sur la tablette, ouvrez **HomeDash > Paramètres**, puis saisissez le PIN administrateur ;
+6. dans **Mises à jour**, touchez **Vérifier** ;
+7. touchez d’abord **Installer X.Y.Z** pour le serveur Pi et attendez le redémarrage automatique ;
+8. revenez dans **Paramètres > Mises à jour**, touchez **Vérifier**, puis **Installer l’application X.Y.Z** ;
 9. lors de la toute première utilisation seulement, Android ouvre **Autoriser depuis cette source** : activez HomeDash puis revenez à l’application ;
 10. confirmez **Mettre à jour** dans l’installateur Android ;
-11. rouvrez HomeDash et vérifiez **Application tablette** dans Paramètres.
+11. rouvrez HomeDash et vérifiez les deux versions dans Paramètres.
 
 Le Raspberry Pi télécharge l’APK depuis la Release, refuse les fichiers de plus de 100 Mo, vérifie le SHA‑256 et ne conserve que la dernière APK en cache. La tablette doit déjà être associée : son jeton local protège le téléchargement. Android vérifie ensuite que l’identifiant d’application et la signature sont identiques à la version installée. L’adresse du serveur, l’orientation et l’association restent donc conservées.
 

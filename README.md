@@ -4,9 +4,9 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.3.0` fournit déjà :
+La version `0.4.0` fournit déjà :
 
-- une grille tactile responsive avec déplacement, redimensionnement, ajout, configuration et suppression de widgets ;
+- une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
 - les widgets horloge, notes autosauvegardées, météo actuelle, prévisions, capteurs, réseau, système et Google Calendar ;
 - météo Open-Meteo mise en cache, Calendar OAuth 2.0 en lecture/écriture, capteurs HTTP et capteurs simulés ;
@@ -14,10 +14,10 @@ La version `0.3.0` fournit déjà :
 - SQLite local, migrations, sauvegardes cohérentes et cache hors ligne ;
 - authentification locale des opérations administratives et association à usage unique des tablettes ;
 - application Android 10+ murale, APK signée, démarrage au boot, plein écran immersif avec navigation rappelable par geste, sortie simple vers Android, orientations portrait/paysage, télémétrie et détection locale de visage comme signal de présence — aucune reconnaissance ;
-- déploiement natif ARMv6 sans Docker, Nginx HTTPS local, `systemd`, releases précompilées, sauvegarde, health check et rollback ;
+- déploiement natif ARMv6 sans Docker, Nginx HTTPS local, `systemd`, releases précompilées, mise à jour depuis le dashboard, sauvegarde, health check et rollback ;
 - CI GitHub, tests TypeScript, archive native et Release Android signée.
 - mise à jour de l’APK directement depuis les paramètres HomeDash, via un cache vérifié sur le Pi ;
-- widget météo de la journée, heure par heure ;
+- widgets météo quotidiens et horaires avec courbes de température colorées, et prévisions horaires continues après minuit ;
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 

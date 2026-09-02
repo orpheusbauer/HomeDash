@@ -15,6 +15,9 @@ done
 grep -Fxq 'WorkingDirectory=/opt/homedash/current' "${SCRIPT_DIRECTORY}/homedash-zero.service"
 grep -Fxq 'LimitCORE=0' "${SCRIPT_DIRECTORY}/homedash-zero.service"
 grep -Fxq 'StartLimitBurst=3' "${SCRIPT_DIRECTORY}/homedash-zero.service"
+grep -Fxq 'Environment=HOMEDASH_UPDATER_SOCKET=/run/homedash-updater/updater.sock' "${SCRIPT_DIRECTORY}/homedash-zero.service"
+grep -Fxq 'ExecStart=/usr/local/bin/node /usr/local/lib/homedash/native-updater-agent.mjs' "${SCRIPT_DIRECTORY}/homedash-native-updater.service"
+node --check "${SCRIPT_DIRECTORY}/native-updater-agent.mjs"
 grep -Fxq 'kernel.core_pattern=/dev/null' "${SCRIPT_DIRECTORY}/60-homedash-core-dumps.conf"
 
 temporary_directory="$(mktemp -d)"

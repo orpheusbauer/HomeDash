@@ -1,6 +1,6 @@
 {
   "name": "homedash",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Dashboard domestique local-first pour Raspberry Pi et tablette Android",
   "type": "module",
@@ -23,6 +23,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
+    "release:check": "node scripts/verify-release-version.mjs",
     "audit:public": "node scripts/audit-public-repository.mjs",
     "test:watch": "vitest",
     "db:migrate": "npm run db:migrate -w @homedash/server",

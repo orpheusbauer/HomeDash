@@ -29,10 +29,11 @@ const releaseSchema = z.object({
 });
 
 const releaseManifestSchema = z.object({
+  kind: z.literal('native'),
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
-  image: z.string().regex(/^ghcr\.io\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/),
-  digest: z.string().regex(/^sha256:[a-f0-9]{64}$/),
-  createdAt: z.string().datetime(),
+  tag: z.string().regex(/^v\d+\.\d+\.\d+$/),
+  archive: z.string().regex(/^homedash-native-\d+\.\d+\.\d+\.tar\.gz$/),
+  checksum: z.string().regex(/^homedash-native-\d+\.\d+\.\d+\.tar\.gz\.sha256$/),
 });
 
 export type ReleaseManifest = z.infer<typeof releaseManifestSchema>;
@@ -157,20 +158,20 @@ export async function checkForUpdates(): Promise<{
   const androidDownloadAvailable =
     release.assets.some((asset) => asset.name === androidNames.apk) &&
     release.assets.some((asset) => asset.name === androidNames.checksum);
-  const manifestAsset = release.assets.find((asset) => asset.name === 'homedash-release.json');
-  let manifest: ReleaseManifest | null = null;
-  if (manifestAsset) {
-    try {
-      const manifestResponse = await fetch(manifestAsset.url, {
-        headers: githubHeaders('application/octet-stream'),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (manifestResponse.ok)
-        manifest = releaseManifestSchema.parse(await manifestResponse.json());
-    } catch {
-      manifest = null;
-    }
-  }
+  const nativeArchive = `homedash-native-${availableVersion}.tar.gz`;
+  const nativeChecksum = `${nativeArchive}.sha256`;
+  const nativeAssetsAvailable =
+    release.assets.some((asset) => asset.name === nativeArchive) &&
+    release.assets.some((asset) => asset.name === nativeChecksum);
+  const manifest: ReleaseManifest | null = nativeAssetsAvailable
+    ? {
+        kind: 'native',
+        version: availableVersion,
+        tag: `v${availableVersion}`,
+        archive: nativeArchive,
+        checksum: nativeChecksum,
+      }
+    : null;
   return {
     installedVersion: config.version,
     availableVersion,

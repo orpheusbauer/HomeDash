@@ -1,10 +1,48 @@
+import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Droplets, Navigation, RefreshCw } from 'lucide-react';
 import type { WeatherData } from '@homedash/contracts';
 import { api } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
 import { WeatherIcon, weatherLabel } from './shared';
+import { TemperatureTrendChart } from './TemperatureTrendChart';
 import type { WidgetComponentProps } from './types';
+
+const WEATHER_ITEM_GAP = 7;
+
+export function responsiveItemCount(
+  availableWidth: number,
+  itemMinimumWidth: number,
+  availableItems: number,
+): number {
+  if (availableItems <= 0) return 0;
+  if (availableWidth <= 0) return Math.min(availableItems, 8);
+  return Math.max(
+    1,
+    Math.min(
+      availableItems,
+      Math.floor((availableWidth + WEATHER_ITEM_GAP) / (itemMinimumWidth + WEATHER_ITEM_GAP)),
+    ),
+  );
+}
+
+function useResponsiveItemCount(availableItems: number, itemMinimumWidth: number) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [count, setCount] = useState(() => Math.min(availableItems, 8));
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const update = () =>
+      setCount(responsiveItemCount(element.clientWidth, itemMinimumWidth, availableItems));
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [availableItems, itemMinimumWidth]);
+
+  return [ref, count] as const;
+}
 
 function weatherParams(config: Record<string, unknown>) {
   return {
@@ -83,6 +121,7 @@ export function CurrentWeatherWidget({ instance }: WidgetComponentProps) {
 
 export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
   const query = useWeather(instance.config);
+  const [daysRef, visibleDayCount] = useResponsiveItemCount(query.data?.daily.length ?? 0, 64);
   if (!query.data)
     return (
       <div className="widget-centered">
@@ -90,10 +129,15 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
       </div>
     );
   const weather = query.data;
+  const days = weather.daily.slice(0, visibleDayCount);
   return (
     <div className="forecast-widget">
-      <div className="forecast-days">
-        {weather.daily.slice(0, 7).map((day) => (
+      <div
+        className="forecast-days"
+        ref={daysRef}
+        style={{ gridTemplateColumns: `repeat(${Math.max(days.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {days.map((day) => (
           <div className="forecast-day" key={day.date}>
             <span>
               {new Date(`${day.date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' })}
@@ -105,28 +149,30 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
           </div>
         ))}
       </div>
-      <div className="forecast-hours">
-        {weather.hourly
-          .filter((hour) => Date.parse(hour.time) >= Date.now() - 3_600_000)
-          .slice(0, 8)
-          .map((hour) => (
-            <span key={hour.time}>
-              {new Date(hour.time).toLocaleTimeString('fr-FR', { hour: '2-digit' })}
-              <strong>{Math.round(hour.temperature)}°</strong>
-            </span>
-          ))}
-      </div>
+      <TemperatureTrendChart
+        title="Évolution des maximales"
+        points={days.map((day) => ({
+          key: day.date,
+          label: new Date(`${day.date}T12:00:00`).toLocaleDateString('fr-FR', {
+            weekday: 'short',
+          }),
+          temperature: day.temperatureMax,
+        }))}
+      />
       <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
     </div>
   );
 }
 
-function localDay(value: string): string {
-  return value.slice(0, 10);
+export function upcomingHours(hourly: WeatherData['hourly'], currentTime: string) {
+  const currentHour = currentTime.slice(0, 13);
+  return hourly.filter((hour) => hour.time.slice(0, 13) >= currentHour);
 }
 
 export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
   const query = useWeather(instance.config);
+  const hours = query.data ? upcomingHours(query.data.hourly, query.data.current.time) : [];
+  const [hoursRef, visibleHourCount] = useResponsiveItemCount(hours.length, 74);
   if (!query.data)
     return (
       <div className="widget-centered">
@@ -135,11 +181,8 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
     );
 
   const weather = query.data;
-  const today = localDay(weather.current.time);
-  const currentHour = weather.current.time.slice(0, 13);
-  const hours = weather.hourly.filter(
-    (hour) => localDay(hour.time) === today && hour.time.slice(0, 13) >= currentHour,
-  );
+  const visibleHours = hours.slice(0, visibleHourCount);
+  const today = weather.current.time.slice(0, 10);
 
   return (
     <div className="hourly-weather-widget">
@@ -156,8 +199,15 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
         </div>
         <small>Mise à jour toutes les 15 min</small>
       </div>
-      <div className="hourly-weather-list" aria-label="Prévisions météo heure par heure">
-        {hours.map((hour, index) => (
+      <div
+        className="hourly-weather-list"
+        aria-label="Prévisions météo heure par heure"
+        ref={hoursRef}
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(visibleHours.length, 1)}, minmax(0, 1fr))`,
+        }}
+      >
+        {visibleHours.map((hour, index) => (
           <div className={index === 0 ? 'is-current' : ''} key={hour.time}>
             <time dateTime={hour.time}>
               {index === 0
@@ -171,11 +221,25 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
             <strong>{Math.round(hour.temperature)}°</strong>
             <span className="hourly-weather-rain">
               <Droplets size={13} />
-              {hour.precipitationProbability ?? 0}%
+              {hour.humidity ?? '—'}%
             </span>
           </div>
         ))}
       </div>
+      <TemperatureTrendChart
+        title="Évolution de la température"
+        points={visibleHours.map((hour, index) => ({
+          key: hour.time,
+          label:
+            index === 0
+              ? 'maintenant'
+              : new Date(hour.time).toLocaleTimeString('fr-FR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+          temperature: hour.temperature,
+        }))}
+      />
       {hours.length === 0 && <p className="form-hint">La journée est terminée.</p>}
       <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
     </div>

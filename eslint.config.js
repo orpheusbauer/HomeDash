@@ -33,7 +33,11 @@ export default tseslint.config(
     },
   },
   {
-    files: ['**/*.config.{js,mjs,ts}', '**/scripts/**/*.{js,mjs,ts}'],
+    files: [
+      '**/*.config.{js,mjs,ts}',
+      '**/scripts/**/*.{js,mjs,ts}',
+      'deployment/**/*.{js,mjs,ts}',
+    ],
     extends: [tseslint.configs.disableTypeChecked],
   },
 );

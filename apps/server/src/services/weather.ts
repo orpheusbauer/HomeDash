@@ -1,5 +1,6 @@
 import type { WeatherData } from '@homedash/contracts';
 import { z } from 'zod';
+import { config } from '../config.js';
 import { AppError } from '../errors.js';
 import { getCache, setCache } from '../repositories/dashboard.js';
 
@@ -19,6 +20,7 @@ const openMeteoSchema = z.object({
   hourly: z.object({
     time: z.array(z.string()),
     temperature_2m: z.array(z.number()),
+    relative_humidity_2m: z.array(z.number().nullable()),
     weather_code: z.array(z.number()),
     precipitation_probability: z.array(z.number().nullable()),
   }),
@@ -50,6 +52,7 @@ function mapResponse(location: string, data: z.infer<typeof openMeteoSchema>): W
     hourly: data.hourly.time.slice(0, 48).map((time, index) => ({
       time,
       temperature: data.hourly.temperature_2m[index] ?? 0,
+      humidity: data.hourly.relative_humidity_2m[index] ?? null,
       weatherCode: data.hourly.weather_code[index] ?? 0,
       precipitationProbability: data.hourly.precipitation_probability[index] ?? null,
     })),
@@ -81,13 +84,13 @@ export async function getWeather(
     forecast_days: '7',
     current:
       'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m',
-    hourly: 'temperature_2m,weather_code,precipitation_probability',
+    hourly: 'temperature_2m,relative_humidity_2m,weather_code,precipitation_probability',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
   });
   try {
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
       signal: AbortSignal.timeout(8000),
-      headers: { 'User-Agent': 'HomeDash/0.3 (self-hosted dashboard)' },
+      headers: { 'User-Agent': `HomeDash/${config.version} (self-hosted dashboard)` },
     });
     if (!response.ok) throw new Error(`Open-Meteo ${response.status}`);
     const data = openMeteoSchema.parse(await response.json());

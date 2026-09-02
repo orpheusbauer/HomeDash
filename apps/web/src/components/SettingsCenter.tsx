@@ -34,6 +34,11 @@ type UpdateInfo = {
   android: { version: string | null; downloadAvailable: boolean };
 };
 type CalendarStatus = { configured: boolean; connected: boolean; message: string };
+type UpdateStatus = {
+  state: 'idle' | 'installing' | 'complete' | 'failed' | 'interrupted';
+  targetVersion?: string;
+  error?: string | null;
+};
 
 const formatBytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
 
@@ -63,6 +68,7 @@ export function SettingsCenter({
   const androidUpdaterSupported = isAndroidApp && supportsAndroidUpdates();
   const [orientation, setOrientation] = useState<DashboardOrientation | null>(null);
   const [androidUpdateStarted, setAndroidUpdateStarted] = useState(false);
+  const [serverUpdateStarted, setServerUpdateStarted] = useState(false);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const updates = useQuery({
     queryKey: ['admin', 'updates'],
@@ -102,11 +108,25 @@ export function SettingsCenter({
   const install = useMutation({
     mutationFn: (manifest: Record<string, unknown>) =>
       api('/api/v1/updates/install', { method: 'POST', body: JSON.stringify({ manifest }) }, true),
+    onSuccess: () => setServerUpdateStarted(true),
+  });
+  const updateStatus = useQuery({
+    queryKey: ['admin', 'updates', 'status'],
+    queryFn: () => api<UpdateStatus>('/api/v1/updates/status', {}, true),
+    enabled: authenticated && serverUpdateStarted,
+    retry: true,
+    refetchInterval: 3_000,
   });
 
   useEffect(() => {
     if (isAndroidApp) setOrientation(getDashboardOrientation());
   }, [isAndroidApp]);
+
+  useEffect(() => {
+    if (updateStatus.data?.state !== 'complete') return;
+    const timer = window.setTimeout(() => window.location.reload(), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [updateStatus.data?.state]);
 
   function changeOrientation(value: DashboardOrientation) {
     setOrientation(value);
@@ -228,7 +248,7 @@ export function SettingsCenter({
           {updates.data?.updateAvailable && updates.data.installable && updates.data.manifest && (
             <button
               className="button button--primary"
-              disabled={install.isPending}
+              disabled={install.isPending || serverUpdateStarted}
               onClick={() => install.mutate(updates.data.manifest!)}
             >
               Installer {updates.data.availableVersion}
@@ -241,26 +261,42 @@ export function SettingsCenter({
             de mise à jour.
           </p>
         )}
-        {install.isSuccess && (
-          <p className="text-success">Mise à jour acceptée. HomeDash va redémarrer.</p>
-        )}
-        {isAndroidApp && androidUpdateAvailable && androidUpdaterSupported && (
-          <button
-            className="button button--primary"
-            disabled={androidUpdateStarted}
-            onClick={startAndroidUpdate}
-          >
-            <Download size={17} />
-            Installer l’application {androidReleaseVersion}
-          </button>
-        )}
-        {isAndroidApp && androidUpdateAvailable && !androidUpdaterSupported && (
-          <p className="form-hint">
-            Cette ancienne APK ne contient pas encore l’installateur intégré. Installez manuellement
-            la version {androidReleaseVersion} une dernière fois ; les versions suivantes se
-            mettront à jour depuis ce bouton sans effacer la configuration.
+        {serverUpdateStarted && updateStatus.data?.state !== 'failed' && (
+          <p className="text-success">
+            {updateStatus.data?.state === 'complete'
+              ? 'Mise à jour terminée. Rechargement de HomeDash…'
+              : 'Mise à jour en cours. HomeDash va redémarrer automatiquement ; ne coupez pas le Raspberry Pi.'}
           </p>
         )}
+        {updateStatus.data?.state === 'failed' && (
+          <p className="form-hint">
+            Échec de la mise à jour serveur. La version précédente reste active. Consultez le guide
+            de mise à jour{updateStatus.data.error ? ` (${updateStatus.data.error})` : ''}.
+          </p>
+        )}
+        {isAndroidApp &&
+          androidUpdateAvailable &&
+          androidUpdaterSupported &&
+          !updates.data?.updateAvailable && (
+            <button
+              className="button button--primary"
+              disabled={androidUpdateStarted}
+              onClick={startAndroidUpdate}
+            >
+              <Download size={17} />
+              Installer l’application {androidReleaseVersion}
+            </button>
+          )}
+        {isAndroidApp &&
+          androidUpdateAvailable &&
+          !androidUpdaterSupported &&
+          !updates.data?.updateAvailable && (
+            <p className="form-hint">
+              Cette ancienne APK ne contient pas encore l’installateur intégré. Installez
+              manuellement la version {androidReleaseVersion} une dernière fois ; les versions
+              suivantes se mettront à jour depuis ce bouton sans effacer la configuration.
+            </p>
+          )}
         {isAndroidApp && androidUpdateStarted && (
           <p className="text-success">
             Suivez les écrans Android : autorisez cette source si demandé, puis confirmez

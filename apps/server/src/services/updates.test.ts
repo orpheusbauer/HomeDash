@@ -11,7 +11,13 @@ describe('mises à jour', () => {
 
   it('refuse un manifeste non vérifiable avant de joindre l’agent', async () => {
     await expect(
-      installUpdate({ version: 'latest', image: 'docker.io/attacker/image', digest: 'bad' }),
+      installUpdate({
+        kind: 'native',
+        version: 'latest',
+        tag: 'vlatest',
+        archive: '../../attaque.tar.gz',
+        checksum: 'bad',
+      }),
     ).rejects.toThrow();
   });
 

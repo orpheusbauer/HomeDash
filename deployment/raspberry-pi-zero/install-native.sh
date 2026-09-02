@@ -68,11 +68,24 @@ id homedash >/dev/null 2>&1 || useradd --system --gid homedash \
 install -d -o root -g root -m 0755 /opt/homedash /opt/homedash/releases
 install -d -o homedash -g homedash -m 0750 /var/lib/homedash /var/lib/homedash/data /var/lib/homedash/data/backups /var/lib/homedash/data/android-updates
 install -d -o root -g homedash -m 0750 /etc/homedash
+install -d -o root -g root -m 0755 /usr/local/lib/homedash
 install -d -o root -g root -m 0755 /etc/sysctl.d /etc/systemd/journald.conf.d
 
+if [[ ! -s /etc/homedash/updater-token ]]; then
+  openssl rand -hex 32 | tr -d '\n' > /etc/homedash/updater-token
+fi
+chown root:homedash /etc/homedash/updater-token
+chmod 0640 /etc/homedash/updater-token
+printf 'HOMEDASH_GROUP_ID=%s\n' "$(getent group homedash | cut -d: -f3)" \
+  > /etc/homedash/native-updater.env
+chown root:homedash /etc/homedash/native-updater.env
+chmod 0640 /etc/homedash/native-updater.env
+
 install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/update-native.sh" /usr/local/sbin/homedash-update-native
+install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/native-updater-agent.mjs" /usr/local/lib/homedash/native-updater-agent.mjs
 install -o root -g root -m 0755 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard" /usr/local/sbin/homedash-disk-guard
 install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-zero.service" /etc/systemd/system/homedash.service
+install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-native-updater.service" /etc/systemd/system/homedash-native-updater.service
 install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard.service" /etc/systemd/system/homedash-disk-guard.service
 install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/homedash-disk-guard.timer" /etc/systemd/system/homedash-disk-guard.timer
 install -o root -g root -m 0644 "${DEPLOYMENT_DIRECTORY}/60-homedash-core-dumps.conf" /etc/sysctl.d/60-homedash-core-dumps.conf
@@ -139,10 +152,11 @@ nginx -t
 
 systemctl daemon-reload
 systemctl reset-failed homedash.service 2>/dev/null || true
-systemctl enable nginx.service homedash.service homedash-disk-guard.timer
+systemctl enable nginx.service homedash.service homedash-native-updater.service homedash-disk-guard.timer
 systemctl restart systemd-journald.service
 systemctl start homedash-disk-guard.service
 systemctl start homedash-disk-guard.timer
+systemctl restart homedash-native-updater.service
 systemctl restart nginx.service
 /usr/local/sbin/homedash-update-native "${TAG}"
 
@@ -152,6 +166,7 @@ echo "Interface: https://${ip_address} ou https://${host_name}"
 echo "CA à copier sur la tablette: /var/lib/homedash/tls/root-ca.crt"
 echo "Diagnostic: sudo systemctl status homedash nginx --no-pager"
 echo "Surveillance disque: sudo systemctl status homedash-disk-guard.timer --no-pager"
+echo "Mises à jour intégrées: sudo systemctl status homedash-native-updater --no-pager"
 if [[ "${legacy_updater_found}" == "true" ]]; then
   echo "Ancien service Docker homedash-updater désactivé et retiré."
 fi

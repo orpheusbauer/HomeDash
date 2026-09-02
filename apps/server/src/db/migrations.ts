@@ -85,4 +85,17 @@ export const migrations = [
       );
     `,
   },
+  {
+    version: 2,
+    name: 'increase_layout_precision',
+    sql: `
+      UPDATE widget_instances
+      SET x = x * 4,
+          y = y * 4,
+          w = w * 4,
+          h = h * 4;
+
+      DELETE FROM layout_revisions;
+    `,
+  },
 ] as const;

@@ -1,199 +1,267 @@
-# Releases et mises à jour natives du Raspberry Pi Zero
+# Publier et installer les mises à jour HomeDash
 
-HomeDash n’utilise pas Docker sur le Raspberry Pi Zero original. Une GitHub Release contient une archive JavaScript déjà compilée. Le Pi installe chaque version dans un dossier séparé et `/opt/homedash/current` désigne la version active.
+Ce guide part d’une installation fonctionnelle en version `0.3.0` avec l’APK signée déjà présente sur la tablette.
 
-À partir de `v0.1.2`, l’updater supprime automatiquement l’ancien long jeton administrateur et configure `HOMEDASH_ADMIN_PIN=0000` avant le redémarrage. Les autres secrets restent inchangés.
+La version `0.4.0` constitue une transition : son installeur ajoute au Raspberry Pi Zero l’agent natif nécessaire au bouton de mise à jour du dashboard. Le passage serveur de `0.3.0` à `0.4.0` demande donc **une dernière commande SSH**. Ensuite, les releases applicatives ordinaires peuvent être installées depuis la tablette. L’APK `0.3.0` sait déjà mettre à jour l’application Android elle-même.
 
-## 1. Contenu d’une release
+## Vue d’ensemble
 
-Un tag `vX.Y.Z` lance `.github/workflows/release.yml`. GitHub Actions :
+Une mise à jour comporte deux éléments distincts :
 
-1. installe les dépendances sur un runner puissant ;
-2. construit les contrats TypeScript, le serveur et l’interface Vite ;
-3. crée `homedash-native-X.Y.Z.tar.gz` ;
-4. crée son fichier `homedash-native-X.Y.Z.tar.gz.sha256` ;
-5. reconstruit le keystore depuis les secrets GitHub et compile l’APK Android release signée ;
-6. publie l’archive native, l’APK et leurs deux SHA-256 dans GitHub Releases.
+1. **Serveur Raspberry Pi** : interface Web, API, base et widgets. C’est là que se trouvent la plupart des nouveautés.
+2. **Application tablette** : enveloppe Android, plein écran, association, présence et installateur APK.
 
-Le Pi ne compile aucun TypeScript et ne télécharge aucune image GHCR.
+Il faut toujours mettre à jour le serveur avant l’APK. Les données, les paramètres, le certificat local, l’adresse du serveur et l’association de la tablette sont conservés.
 
-## 2. Publier une nouvelle version depuis le PC
+## Partie A — publier une nouvelle version depuis le PC
 
-Mettez `VERSION`, `package.json` et les trois packages applicatifs à la même version. Exécutez :
+### A1. Choisir le numéro
+
+HomeDash suit `MAJEURE.MINEURE.CORRECTIF` :
+
+- correctif, par exemple `0.4.0` → `0.4.1`, pour une correction compatible ;
+- mineure, par exemple `0.4.0` → `0.5.0`, pour de nouvelles fonctions compatibles ;
+- majeure, par exemple `0.9.0` → `1.0.0`, pour un changement incompatible important.
+
+Un tag publié ne doit jamais être déplacé ou réutilisé. En cas d’erreur après `v0.4.0`, corrigez et publiez `v0.4.1`.
+
+### A2. Synchroniser tous les numéros de version
+
+Mettez le même numéro dans :
+
+- `VERSION` ;
+- `package.json` à la racine ;
+- `apps/server/package.json` ;
+- `apps/web/package.json` ;
+- `packages/contracts/package.json` ;
+- les dépendances internes `@homedash/contracts` ;
+- `versionName` dans `apps/android/app/build.gradle.kts`.
+
+Incrémentez aussi `versionCode` Android d’au moins 1. Android refuse une APK dont le code n’est pas supérieur à celui déjà installé.
+
+Le contrôle automatisé doit réussir :
 
 ```powershell
+npm.cmd run release:check
+```
+
+Pour la présente release, les valeurs attendues sont `0.4.0` et `versionCode = 7`.
+
+### A3. Exécuter tous les contrôles locaux
+
+Depuis la racine du dépôt :
+
+```powershell
+npm.cmd install
 npm.cmd run format:check
 npm.cmd run lint
+npm.cmd run audit:public
+npm.cmd run release:check
 npm.cmd run typecheck
 npm.cmd test
 npm.cmd run build
+git diff --check
 git status --short
 ```
 
-Committez puis poussez `main`. Attendez une CI entièrement verte. Créez seulement ensuite le tag :
+Corrigez toute erreur avant de continuer. Lisez la sortie de `git status --short` et vérifiez que chaque fichier modifié appartient bien à la release. Ne commitez jamais `.env`, token Google/GitHub, keystore, base SQLite, APK locale ou certificat privé.
+
+### A4. Créer le commit et pousser `main`
+
+Ajoutez uniquement les fichiers voulus, puis contrôlez ce qui sera committé :
 
 ```powershell
-git tag -a v0.3.0 -m "HomeDash 0.3.0"
-git push origin v0.3.0
+git add VERSION package.json package-lock.json apps packages deployment docs scripts .github README.md .env.example
+git diff --cached --check
+git diff --cached --stat
+git status --short
 ```
 
-Ne réutilisez et ne déplacez jamais un tag publié. Incrémentez toujours `VERSION`, les packages et `versionCode` Android avant le nouveau tag.
+Créez le commit puis poussez :
 
-## 3. Vérifier la release dans GitHub
+```powershell
+git commit -m "Release 0.4.0: graphiques météo et mises à jour intégrées"
+git push origin main
+```
 
-Dans **Actions > Release**, attendez le vert. Dans **Releases > v0.3.0**, vérifiez :
+Si votre branche n’est pas `main`, ouvrez d’abord une pull request et fusionnez-la. Le tag doit désigner le commit effectivement présent sur `main`.
+
+### A5. Attendre la CI avant de créer le tag
+
+Dans GitHub :
+
+1. ouvrez **Actions > CI** ;
+2. sélectionnez l’exécution correspondant au commit qui vient d’être poussé ;
+3. attendez que les jobs **web-server** et **android** soient verts ;
+4. ouvrez les logs si un job est rouge, corrigez sur le PC, créez un nouveau commit et poussez-le ;
+5. ne créez le tag qu’une fois la CI du dernier commit entièrement verte.
+
+La CI vérifie formatage, lint, audit public, cohérence des versions, types, tests, build Web/serveur, archive native et APK Android debug.
+
+### A6. Créer et pousser le tag
+
+Vérifiez que `HEAD` correspond bien au commit vert :
+
+```powershell
+git status --short
+git log -1 --oneline
+git tag -a v0.4.0 -m "HomeDash 0.4.0"
+git push origin v0.4.0
+```
+
+Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
+
+### A7. Attendre et vérifier la Release
+
+Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
+
+1. vérifie que tous les numéros correspondent au tag ;
+2. construit le serveur, l’interface et les contrats ;
+3. fabrique l’archive native du Pi et son SHA-256 ;
+4. reconstruit le keystore depuis les secrets GitHub ;
+5. compile l’APK release signée et son SHA-256 ;
+6. publie la GitHub Release.
+
+Dans **Releases > v0.4.0**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.3.0.tar.gz
-homedash-native-0.3.0.tar.gz.sha256
-homedash-kiosk-0.3.0.apk
-homedash-kiosk-0.3.0.apk.sha256
+homedash-native-0.4.0.tar.gz
+homedash-native-0.4.0.tar.gz.sha256
+homedash-kiosk-0.4.0.apk
+homedash-kiosk-0.4.0.apk.sha256
 ```
 
-L’absence du SHA-256 interdit l’installation automatique. Ne fabriquez pas ce fichier manuellement après coup : corrigez le workflow et créez une nouvelle version.
+N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
 
-## 4. Mettre à jour le clone de maintenance sur le Pi
+## Partie B — transition unique de 0.3.0 vers 0.4.0
+
+Cette étape installe l’agent natif sécurisé. Elle se fait une fois depuis le PC, en SSH. Elle conserve `/etc/homedash/homedash.env`, la base SQLite, les sauvegardes, le token GitHub et l’autorité de certification.
+
+Connectez-vous au Pi puis exécutez :
 
 ```bash
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.3.0
+git checkout v0.4.0
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.0
 ```
 
-Le statut doit être propre. Le clone ne sert pas à compiler ; il apporte les nouveaux scripts de déploiement et la documentation correspondant au tag.
+Le statut Git doit être propre avant le `checkout`. Ne supprimez pas des modifications inconnues : sauvegardez-les et comprenez-les d’abord.
 
-Avant d’installer, recopiez la dernière version du script d’update :
+L’installeur remet en place les services, installe l’agent `homedash-native-updater`, crée son secret local, télécharge les assets de la Release, sauvegarde les données, bascule la version et effectue un health check. Sur un Pi Zero, `npm ci` peut prendre plusieurs minutes. Ne fermez pas SSH et ne coupez pas l’alimentation.
 
-```bash
-sudo install -o root -g root -m 0755 \
-  deployment/raspberry-pi-zero/update-native.sh \
-  /usr/local/sbin/homedash-update-native
-```
+La migration 0.4.0 conserve toutes les positions et dimensions visuelles, mais remet à zéro l’historique temporaire du bouton **Annuler la disposition** afin de convertir la grille de 12 à 48 unités sans restaurer ensuite une ancienne échelle.
 
-Si la release modifie l’unité `systemd` ou Nginx, relancez plutôt l’installeur idempotent :
-
-```bash
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
-```
-
-Pour le passage de `0.2.x` à `0.3.0`, utilisez l’installeur complet : il conserve `/etc/homedash/homedash.env`, la base et l’autorité de certification, tout en ajoutant la configuration du cache APK et les derniers scripts. Les mises à jour suivantes qui ne touchent ni `systemd`, ni Nginx peuvent utiliser la commande normale ci-dessous.
-
-## 5. Installation normale d’une release
-
-```bash
-sudo homedash-update-native v0.3.0
-```
-
-Le script :
-
-1. lit le dépôt configuré dans `/etc/homedash/homedash.env` ;
-2. utilise `/etc/homedash/github-token` si le dépôt est privé ;
-3. télécharge l’archive et le SHA-256 via l’API GitHub ;
-4. vérifie le hash et refuse les chemins d’archive dangereux ;
-5. installe dans `/opt/homedash/releases/0.3.0` ;
-6. lance `npm ci --omit=dev --ignore-scripts` avec un seul job et une limite mémoire ;
-7. arrête brièvement HomeDash ;
-8. sauvegarde les données dans `/var/lib/homedash/data/backups` ;
-9. bascule atomiquement le lien `/opt/homedash/current` ;
-10. attend jusqu’à 120 secondes que `/health/ready` réponde ;
-11. restaure automatiquement la base et l’ancien lien en cas d’échec.
-
-N’interrompez pas le Pi entre l’arrêt du service et la fin du health check.
-
-## 6. Vérifications après mise à jour
+Vérifiez ensuite :
 
 ```bash
 cat /var/lib/homedash/installed-version
-readlink -f /opt/homedash/current
-sudo systemctl status homedash --no-pager
+sudo systemctl is-active homedash nginx homedash-native-updater
 curl --fail http://127.0.0.1:4100/health/ready
-sudo journalctl -u homedash --since '15 minutes ago' --no-pager
+sudo journalctl -u homedash -u homedash-native-updater --since '15 minutes ago' --no-pager
 ```
 
-Depuis la tablette :
+Résultat attendu : version `0.4.0`, trois services `active` et réponse HTTP 200.
 
-- rechargez l’interface ;
-- vérifiez les widgets essentiels ;
-- testez une écriture de note ;
-- vérifiez la télémétrie de la tablette ;
-- confirmez que la version affichée correspond à la release.
+## Partie C — installer les versions suivantes depuis la tablette
 
-## 7. Rollback manuel
+Cette procédure s’applique après la transition serveur 0.4.0.
 
-Le rollback automatique couvre l’échec de démarrage immédiat. Pour revenir manuellement après un problème fonctionnel découvert plus tard :
+### C1. Mettre à jour le serveur Pi
+
+1. Gardez la tablette alimentée et le Pi connecté à Internet.
+2. Ouvrez **HomeDash > Paramètres**.
+3. Saisissez le PIN administrateur.
+4. Dans **Mises à jour**, touchez **Vérifier**.
+5. Vérifiez la version installée et la dernière version proposée.
+6. Touchez **Installer X.Y.Z** sous la partie serveur.
+7. Ne coupez pas le Pi. L’interface indique que la mise à jour est en cours, devient brièvement indisponible, puis se recharge à la fin.
+8. Rouvrez **Paramètres > Mises à jour** et vérifiez que **Serveur Raspberry Pi** affiche `X.Y.Z` et **À jour**.
+
+L’agent n’accepte qu’un numéro SemVer et les noms exacts de l’archive native publiée. Le script télécharge l’archive et son SHA-256 depuis la Release configurée, vérifie le hash et les chemins, installe dans un dossier séparé, crée une sauvegarde, bascule atomiquement `current`, puis restaure automatiquement l’ancienne version si le health check échoue.
+
+### C2. Mettre à jour l’application Android
+
+Après la réussite de la mise à jour serveur :
+
+1. dans **Paramètres > Mises à jour**, touchez de nouveau **Vérifier** ;
+2. touchez **Installer l’application X.Y.Z** ;
+3. la première fois seulement, Android ouvre **Installer des applications inconnues** : autorisez HomeDash, puis revenez ;
+4. confirmez **Mettre à jour** dans l’écran système Android ;
+5. rouvrez HomeDash et vérifiez **Application tablette X.Y.Z**.
+
+Android exige toujours cette confirmation visible pour une APK hors Play Store. HomeDash ne la contourne pas. L’adresse du Pi, l’orientation et l’association restent enregistrées.
+
+## Ce qui reste exceptionnellement manuel
+
+Une release qui modifie seulement l’interface, les widgets, l’API ou les migrations SQLite suit la procédure tablette normale.
+
+Une release qui change l’unité `systemd`, Nginx, le runtime Node ARMv6, le script d’update lui-même ou l’agent natif doit annoncer explicitement **installeur complet requis** dans ses notes. Dans ce cas seulement :
 
 ```bash
+cd /opt/homedash/repository
+git fetch --tags origin
+git checkout vX.Y.Z
+sudo bash deployment/raspberry-pi-zero/install-native.sh vX.Y.Z
+```
+
+Ce garde-fou empêche l’agent privilégié de modifier son propre périmètre ou d’exécuter des commandes arbitraires depuis l’interface Web.
+
+## Dépannage
+
+### Le bouton serveur n’apparaît pas
+
+Vérifiez les quatre causes possibles :
+
+- aucune version plus récente n’est publiée ;
+- l’archive native ou son `.sha256` manque dans la Release ;
+- le Pi n’accède pas à GitHub ;
+- l’agent natif n’est pas installé ou actif.
+
+Diagnostic sur le Pi :
+
+```bash
+sudo systemctl status homedash-native-updater --no-pager
+sudo ls -l /run/homedash-updater/updater.sock /etc/homedash/updater-token
+sudo journalctl -u homedash-native-updater -n 100 --no-pager
+```
+
+### La mise à jour serveur échoue
+
+La version précédente doit rester active ou être restaurée automatiquement. Consultez :
+
+```bash
+sudo tail -n 100 /var/lib/homedash/data/native-update.log
+sudo cat /var/lib/homedash/data/update-status.json
+sudo journalctl -u homedash --since '30 minutes ago' --no-pager
+```
+
+Pour relancer manuellement la même procédure vérifiée :
+
+```bash
+sudo homedash-update-native vX.Y.Z
+```
+
+### Le bouton APK n’apparaît pas
+
+- mettez d’abord le serveur à la dernière version ;
+- vérifiez que l’APK et son `.sha256` existent dans la Release ;
+- vérifiez que l’application installée est au moins en version 0.3.0 ;
+- vérifiez que la tablette est toujours associée au Pi.
+
+### Android refuse l’APK
+
+La nouvelle APK doit conserver le même `applicationId`, être signée par le même keystore et avoir un `versionCode` supérieur. Si l’un de ces trois éléments diffère, Android refuse la mise à jour pour protéger les données de l’application.
+
+## Rollback manuel de dernier recours
+
+Le rollback automatique couvre l’échec de démarrage immédiat. Pour un défaut fonctionnel constaté plus tard, identifiez d’abord les versions et sauvegardes :
+
+```bash
+readlink -f /opt/homedash/current
 ls -la /opt/homedash/releases
 ls -lt /var/lib/homedash/data/backups
-sudo systemctl stop homedash
-sudo ln -sfn /opt/homedash/releases/0.1.1 /opt/homedash/current
-sudo systemctl start homedash
-curl --fail http://127.0.0.1:4100/health/ready
 ```
 
-Attention : revenir seulement au code ne rétrograde pas automatiquement le schéma SQLite. Si la nouvelle version a lancé une migration incompatible, restaurez aussi la sauvegarde `pre-X.Y.Z-*.tar.gz` créée juste avant cette mise à jour. Suivez [backup-and-restore.md](backup-and-restore.md).
-
-## 8. Rotation du token GitHub
-
-Avant l’expiration du fine-grained token :
-
-1. créez un nouveau token limité au dépôt, `Contents: Read-only` ;
-2. saisissez-le sur le Pi sans historique :
-
-```bash
-read -rsp "Nouveau token GitHub: " GITHUB_RELEASE_TOKEN; echo
-printf '%s' "$GITHUB_RELEASE_TOKEN" | sudo tee /etc/homedash/github-token >/dev/null
-unset GITHUB_RELEASE_TOKEN
-sudo chown root:homedash /etc/homedash/github-token
-sudo chmod 0640 /etc/homedash/github-token
-```
-
-3. testez la prochaine release ;
-4. révoquez l’ancien token dans GitHub.
-
-## 9. Mise à jour de Node.js ARMv6
-
-Ne remplacez pas Node à chaque release HomeDash. La version ARMv6 est verrouillée avec un hash dans `install-node-armv6.sh`.
-
-Avant de changer cette version :
-
-- vérifiez qu’un asset `linux-armv6l` existe réellement ;
-- vérifiez sa provenance et son SHA-256 ;
-- vérifiez que `node:sqlite` fonctionne ;
-- testez HomeDash sur le vrai Pi ;
-- gardez l’ancien dossier `/opt/node-v…` jusqu’à validation.
-
-Node 24 n’est actuellement pas produit par la recette ARMv6 utilisée. Ne faites pas pointer `/usr/local/bin/node` vers un binaire ARMv7/ARM64.
-
-## 10. Nettoyage manuel des anciennes releases
-
-Le script ne supprime rien automatiquement. Après plusieurs mises à jour validées, gardez au moins la version active et une version précédente :
-
-```bash
-readlink -f /opt/homedash/current
-ls -la /opt/homedash/releases
-```
-
-Avant toute suppression, vérifiez que le dossier n’est pas la cible de `current` et qu’une sauvegarde exploitable existe. Sur une petite carte SD, surveillez aussi :
-
-```bash
-df -h /
-du -sh /opt/homedash/releases/* /var/lib/homedash/data/backups/*
-```
-
-## 11. Mise à jour de l’application Android depuis HomeDash
-
-À partir de l’APK `0.3.0`, la tablette n’a plus besoin d’ouvrir GitHub. Après la mise à jour du serveur Pi :
-
-1. sur la tablette, ouvrez **HomeDash > Paramètres** et déverrouillez avec le PIN ;
-2. dans **Mises à jour**, touchez **Vérifier** ;
-3. si **Installer l’application X.Y.Z** apparaît, touchez-le ;
-4. la première fois seulement, autorisez HomeDash dans **Installer des applications inconnues**, puis revenez ;
-5. confirmez la mise à jour dans l’écran système Android.
-
-Le serveur télécharge l’APK de la Release avec son éventuel token GitHub privé, limite le fichier à 100 Mo, valide son SHA‑256 et ne garde qu’une version sous `/var/lib/homedash/data/android-updates`. L’endpoint de téléchargement exige le jeton de la tablette associée. L’application recalcule également le SHA‑256 avant de transmettre le fichier par URI privée à l’installateur Android.
-
-Android n’accepte la mise à jour que si l’`applicationId`, le certificat de signature et le `versionCode` sont cohérents. Il faut donc conserver le même keystore et incrémenter `versionCode` à chaque release. Aucune mise à jour ne nécessite de réinstaller la CA TLS ou de refaire l’association.
-
-La mise à jour du **serveur Pi** reste volontairement une commande SSH avec `sudo`. Donner au serveur web le droit de remplacer son propre code et de contrôler `systemd` augmenterait fortement les conséquences d’une faille web. L’interface distingue donc explicitement les deux composants : serveur Pi et application tablette.
+Suivez ensuite [backup-and-restore.md](backup-and-restore.md). Revenir seulement au code ne rétrograde pas automatiquement SQLite ; si une migration incompatible a été appliquée, restaurez aussi la sauvegarde `pre-X.Y.Z-*.tar.gz` créée avant la mise à jour.

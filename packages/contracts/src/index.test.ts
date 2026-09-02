@@ -27,7 +27,7 @@ describe('contrats HomeDash', () => {
     expect(() =>
       saveLayoutSchema.parse({
         expectedRevision: 0,
-        items: [{ id: crypto.randomUUID(), x: 11, y: 0, w: 2, h: 2 }],
+        items: [{ id: crypto.randomUUID(), x: 47, y: 0, w: 2, h: 8 }],
       }),
     ).toThrow();
   });

@@ -92,12 +92,13 @@ Les mises à jour arrêtent le processus avant la sauvegarde afin de produire un
 ```text
 /opt/homedash/releases/0.2.0
 /opt/homedash/releases/0.3.0
-/opt/homedash/current -> /opt/homedash/releases/0.3.0
+/opt/homedash/releases/0.4.0
+/opt/homedash/current -> /opt/homedash/releases/0.4.0
 ```
 
-L’updater SSH télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.
+L’updater natif télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.
 
-Le serveur web n’a aucun droit `sudo` et ne peut pas déclencher cette opération. L’installation depuis l’interface est donc désactivée sur cette première architecture native.
+Depuis 0.4.0, un agent `systemd` séparé, exécuté avec les privilèges nécessaires, accepte uniquement un manifeste de release natif strict sur un socket Unix protégé par un secret local. Le serveur web ne reçoit aucun droit `sudo` et ne peut demander ni commande arbitraire, ni URL de téléchargement libre. L’interface peut ainsi lancer une release HomeDash publiée, puis suivre son état, sans exposer un shell privilégié.
 
 ## HTTPS local
 

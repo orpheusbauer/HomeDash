@@ -4,8 +4,8 @@ export const widgetStatusSchema = z.enum(['loading', 'ready', 'stale', 'offline'
 export type WidgetStatus = z.infer<typeof widgetStatusSchema>;
 
 export const gridSizeSchema = z.object({
-  w: z.number().int().min(1).max(12),
-  h: z.number().int().min(1).max(24),
+  w: z.number().int().min(1).max(48),
+  h: z.number().int().min(1).max(96),
 });
 
 export const widgetCapabilitySchema = z.enum([
@@ -52,10 +52,10 @@ export const widgetInstanceSchema = z.object({
   widgetId: z.string(),
   title: z.string().max(80).nullable(),
   config: z.record(z.string(), z.unknown()),
-  x: z.number().int().min(0).max(11),
+  x: z.number().int().min(0).max(47),
   y: z.number().int().min(0),
-  w: z.number().int().min(1).max(12),
-  h: z.number().int().min(1).max(24),
+  w: z.number().int().min(1).max(48),
+  h: z.number().int().min(1).max(96),
   revision: z.number().int().min(0),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -65,12 +65,12 @@ export type WidgetInstance = z.infer<typeof widgetInstanceSchema>;
 export const layoutItemSchema = z
   .object({
     id: z.string().uuid(),
-    x: z.number().int().min(0).max(11),
+    x: z.number().int().min(0).max(47),
     y: z.number().int().min(0),
-    w: z.number().int().min(1).max(12),
-    h: z.number().int().min(1).max(24),
+    w: z.number().int().min(1).max(48),
+    h: z.number().int().min(1).max(96),
   })
-  .refine((item) => item.x + item.w <= 12, { message: 'Widget outside the 12-column grid' });
+  .refine((item) => item.x + item.w <= 48, { message: 'Widget outside the 48-column grid' });
 export type LayoutItem = z.infer<typeof layoutItemSchema>;
 
 export const saveLayoutSchema = z.object({
@@ -157,6 +157,7 @@ export const weatherSchema = z.object({
     z.object({
       time: z.string(),
       temperature: z.number(),
+      humidity: z.number().nullable(),
       weatherCode: z.number().int(),
       precipitationProbability: z.number().nullable(),
     }),

@@ -5,6 +5,18 @@ import type { LayoutItem, WidgetInstance, WidgetManifest } from '@homedash/contr
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 
+const BASE_GRID_COLUMNS = 48;
+
+export function normalizeResponsiveLayout(
+  item: { x: number; w: number },
+  currentColumns: number,
+): { x: number; w: number } {
+  const scale = BASE_GRID_COLUMNS / Math.max(1, currentColumns);
+  const x = Math.max(0, Math.round(item.x * scale));
+  const width = Math.max(1, Math.round(item.w * scale));
+  return { x: Math.min(x, BASE_GRID_COLUMNS - 1), w: Math.min(width, BASE_GRID_COLUMNS - x) };
+}
+
 interface DashboardGridProps {
   instances: WidgetInstance[];
   manifests: WidgetManifest[];
@@ -35,16 +47,16 @@ export function DashboardGrid({
     readyRef.current = false;
     const grid = GridStack.init(
       {
-        column: 12,
+        column: BASE_GRID_COLUMNS,
         columnOpts: {
           breakpointForWindow: true,
           breakpoints: [
-            { w: 900, c: 6, layout: 'moveScale' },
+            { w: 900, c: 24, layout: 'moveScale' },
             { w: 560, c: 1, layout: 'list' },
           ],
           layout: 'moveScale',
         },
-        cellHeight: 86,
+        cellHeight: 22,
         margin: 8,
         float: true,
         animate: true,
@@ -59,15 +71,20 @@ export function DashboardGrid({
     gridRef.current = grid;
     const onChange = (_event: Event, nodes: GridStackNode[]) => {
       if (!readyRef.current || !editing) return;
+      const currentColumns = grid.getColumn();
       const items = nodes
         .map((node) => {
           const id = node.el?.getAttribute('gs-id');
           if (!id) return null;
+          const normalized = normalizeResponsiveLayout(
+            { x: node.x ?? 0, w: node.w ?? 1 },
+            currentColumns,
+          );
           return {
             id,
-            x: node.x ?? 0,
+            x: normalized.x,
             y: node.y ?? 0,
-            w: node.w ?? 1,
+            w: normalized.w,
             h: node.h ?? 1,
           } satisfies LayoutItem;
         })

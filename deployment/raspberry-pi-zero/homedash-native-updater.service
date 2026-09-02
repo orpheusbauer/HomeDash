@@ -1,0 +1,32 @@
+[Unit]
+Description=HomeDash native release updater
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/local/lib/homedash/native-updater-agent.mjs
+
+[Service]
+Type=simple
+User=root
+Group=homedash
+EnvironmentFile=-/etc/homedash/native-updater.env
+ExecStart=/usr/local/bin/node /usr/local/lib/homedash/native-updater-agent.mjs
+Restart=on-failure
+RestartSec=30
+LimitCORE=0
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0007
+RuntimeDirectory=homedash-updater
+RuntimeDirectoryMode=0770
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homedash-native-updater
+
+[Install]
+WantedBy=multi-user.target

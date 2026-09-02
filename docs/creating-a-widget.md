@@ -63,9 +63,9 @@ Dans `apps/server/src/widget-catalog.ts` :
   icon: 'BadgeEuro',
   version: '1.0.0',
   size: {
-    default: { w: 3, h: 3 },
-    min: { w: 2, h: 2 },
-    max: { w: 8, h: 6 },
+    default: { w: 12, h: 12 },
+    min: { w: 8, h: 8 },
+    max: { w: 32, h: 24 },
   },
   configSchema: {
     type: 'object',
@@ -77,11 +77,13 @@ Dans `apps/server/src/widget-catalog.ts` :
 }
 ```
 
-Principes de taille sur la grille 12 colonnes :
+La grille de référence comporte 48 colonnes et des rangées de 22 px. Les tailles historiques ont été multipliées par quatre lors de la migration 0.4.0 afin de conserver visuellement les dispositions existantes tout en autorisant des ajustements beaucoup plus fins.
 
-- largeur 2–3 : valeur principale uniquement ;
-- largeur 4–6 : valeur, variation, mise à jour ;
-- largeur 7+ : historique éventuel ;
+Principes de taille :
+
+- largeur 8–12 : valeur principale uniquement ;
+- largeur 16–24 : valeur, variation, mise à jour ;
+- largeur 28+ : historique éventuel ;
 - hauteur minimale suffisante pour une cible tactile de 44 px et les états erreur/chargement.
 
 Le manifeste est une déclaration, pas un endroit où exécuter du code.

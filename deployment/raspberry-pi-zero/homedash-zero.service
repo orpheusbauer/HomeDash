@@ -1,7 +1,7 @@
 [Unit]
 Description=HomeDash native service for Raspberry Pi Zero
-After=network-online.target
-Wants=network-online.target
+After=network-online.target homedash-native-updater.service
+Wants=network-online.target homedash-native-updater.service
 ConditionPathExists=/opt/homedash/current/apps/server/dist/index.js
 StartLimitIntervalSec=300
 StartLimitBurst=3
@@ -14,6 +14,8 @@ WorkingDirectory=/opt/homedash/current
 EnvironmentFile=/etc/homedash/homedash.env
 Environment=NODE_ENV=production
 Environment=NODE_OPTIONS=--max-old-space-size=192
+Environment=HOMEDASH_UPDATER_SOCKET=/run/homedash-updater/updater.sock
+Environment=HOMEDASH_UPDATER_TOKEN_FILE=/etc/homedash/updater-token
 ExecStart=/usr/local/bin/node apps/server/dist/index.js
 Restart=on-failure
 RestartSec=15
@@ -34,7 +36,7 @@ ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
 LockPersonality=true
-ReadWritePaths=/var/lib/homedash/data
+ReadWritePaths=/var/lib/homedash/data /run/homedash-updater
 UMask=0007
 MemoryHigh=320M
 MemoryMax=400M
