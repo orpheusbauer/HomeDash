@@ -9,7 +9,9 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -53,8 +55,32 @@ class MainActivity : ComponentActivity() {
     private var exitingToAndroid = false
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) startPresenceService()
-    }
+            if (granted) {
+                startMonitoringIfAuthorized()
+                requestNotificationPermissionIfNeeded()
+                Toast.makeText(
+                    this,
+                    "Caméra autorisée — les images restent analysées localement",
+                    Toast.LENGTH_LONG,
+                ).show()
+            } else {
+                preferences
+                    .edit()
+                    .putBoolean(KEY_MOTION_WAKE_ENABLED, false)
+                    .putBoolean(KEY_AUTO_SCREEN_OFF, false)
+                    .apply()
+                Toast.makeText(
+                    this,
+                    "Caméra refusée — fonctions de présence désactivées",
+                    Toast.LENGTH_LONG,
+                ).show()
+            }
+            dispatchMotionWakeStatusChanged()
+        }
+    private val notificationPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            dispatchMotionWakeStatusChanged()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,10 +98,7 @@ class MainActivity : ComponentActivity() {
         exitingToAndroid = false
         leaveLegacyKioskMode()
         hideSystemBars()
-        if (
-            webView != null &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        ) {
+        if (webView != null && shouldRunPresenceService()) {
             startPresenceService()
         }
         if (deviceAdminRequestPending) {
@@ -91,6 +114,7 @@ class MainActivity : ComponentActivity() {
                 },
                 Toast.LENGTH_LONG,
             ).show()
+            if (enabled) requestCameraAndStart()
             if (webView == null) showSetup()
         }
         pendingUpdateVersion?.let { version ->
@@ -103,7 +127,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        stopService(Intent(this, PresenceService::class.java))
+        if (!isMotionWakeEnabled()) {
+            stopService(Intent(this, PresenceService::class.java))
+        }
     }
 
     private fun leaveLegacyKioskMode() {
@@ -205,7 +231,7 @@ class MainActivity : ComponentActivity() {
         setContentView(view)
         hideSystemBars()
         view.loadUrl(serverUrl)
-        requestCameraAndStart()
+        startMonitoringIfAuthorized()
     }
 
     private fun effectivePort(uri: Uri): Int =
@@ -314,6 +340,7 @@ class MainActivity : ComponentActivity() {
             } else if (isDeviceAdminActive()) {
                 preferences.edit().putBoolean(KEY_AUTO_SCREEN_OFF, true).apply()
                 showSetup()
+                requestCameraAndStart()
             } else {
                 deviceAdminRequestPending = true
                 startActivity(
@@ -389,8 +416,28 @@ class MainActivity : ComponentActivity() {
     private fun requestCameraAndStart() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startPresenceService()
+            requestNotificationPermissionIfNeeded()
         } else {
             cameraPermission.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun startMonitoringIfAuthorized() {
+        if (shouldRunPresenceService()) startPresenceService()
+    }
+
+    private fun shouldRunPresenceService(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+            PackageManager.PERMISSION_GRANTED &&
+            (isMotionWakeEnabled() || isAutoScreenOffEnabled())
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -405,6 +452,75 @@ class MainActivity : ComponentActivity() {
 
     private fun isAutoScreenOffEnabled(): Boolean =
         preferences.getBoolean(KEY_AUTO_SCREEN_OFF, false) && isDeviceAdminActive()
+
+    private fun isMotionWakeEnabled(): Boolean =
+        preferences.getBoolean(KEY_MOTION_WAKE_ENABLED, false) && hasFrontCamera()
+
+    private fun hasFrontCamera(): Boolean =
+        packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
+
+    private fun setMotionWakeEnabled(enabled: Boolean) {
+        if (enabled && !hasFrontCamera()) {
+            preferences.edit().putBoolean(KEY_MOTION_WAKE_ENABLED, false).apply()
+            Toast.makeText(this, "Aucune caméra frontale disponible", Toast.LENGTH_LONG).show()
+            dispatchMotionWakeStatusChanged()
+            return
+        }
+
+        preferences.edit().putBoolean(KEY_MOTION_WAKE_ENABLED, enabled).apply()
+        if (enabled) {
+            requestCameraAndStart()
+        } else if (isAutoScreenOffEnabled()) {
+            startMonitoringIfAuthorized()
+        } else {
+            stopService(Intent(this, PresenceService::class.java))
+        }
+        dispatchMotionWakeStatusChanged()
+    }
+
+    private fun motionWakeStatus(): String {
+        val power = getSystemService(PowerManager::class.java)
+        return JSONObject()
+            .put("supported", hasFrontCamera())
+            .put("enabled", isMotionWakeEnabled())
+            .put(
+                "cameraGranted",
+                ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+                    PackageManager.PERMISSION_GRANTED,
+            ).put(
+                "notificationGranted",
+                Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                    ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED,
+            ).put("batteryOptimizationsIgnored", power.isIgnoringBatteryOptimizations(packageName))
+            .toString()
+    }
+
+    private fun dispatchMotionWakeStatusChanged() {
+        webView?.post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new Event('homedash:motion-wake-status'))",
+                null,
+            )
+        }
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        val directRequest =
+            Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:$packageName"))
+        runCatching { startActivity(directRequest) }
+            .onFailure {
+                runCatching { startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+            }
+    }
+
+    private fun openAppPermissionSettings() {
+        startActivity(
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                .setData(Uri.parse("package:$packageName")),
+        )
+    }
 
     private fun exitToAndroid() {
         exitingToAndroid = true
@@ -558,6 +674,29 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
+        fun getMotionWakeStatus(): String = motionWakeStatus()
+
+        @JavascriptInterface
+        fun setMotionWakeEnabled(enabled: Boolean) {
+            runOnUiThread { this@MainActivity.setMotionWakeEnabled(enabled) }
+        }
+
+        @JavascriptInterface
+        fun requestMotionWakePermission() {
+            runOnUiThread { requestCameraAndStart() }
+        }
+
+        @JavascriptInterface
+        fun openBatteryOptimizationSettings() {
+            runOnUiThread { this@MainActivity.openBatteryOptimizationSettings() }
+        }
+
+        @JavascriptInterface
+        fun openAppPermissionSettings() {
+            runOnUiThread { this@MainActivity.openAppPermissionSettings() }
+        }
+
+        @JavascriptInterface
         fun openAppSettings() {
             runOnUiThread { showSetup() }
         }
@@ -579,6 +718,7 @@ class MainActivity : ComponentActivity() {
         private const val KEY_SERVER_URL = "serverUrl"
         private const val KEY_ORIENTATION = "orientation"
         private const val KEY_AUTO_SCREEN_OFF = "autoScreenOff"
+        private const val KEY_MOTION_WAKE_ENABLED = "motionWakeEnabled"
         private const val KEY_DEVICE_ID = "deviceId"
         private const val KEY_DEVICE_TOKEN = "deviceToken"
         private const val ORIENTATION_LANDSCAPE = "landscape"

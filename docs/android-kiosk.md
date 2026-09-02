@@ -2,7 +2,7 @@
 
 Ce guide cible une tablette sous Android 10 ou ultérieur. HomeDash `0.3.0` utilise le plein écran immersif Android : la barre d’état et la barre de navigation sont masquées pendant l’affichage, mais un glissement depuis le bord inférieur fait réapparaître temporairement Retour, Accueil et les applications récentes. L’application ne devient ni lanceur Android, ni mode kiosque verrouillé ; le bouton **Android** reste visible dans la barre supérieure.
 
-HomeDash conserve en parallèle les fonctions murales utiles : icône dédiée, ouverture automatique après redémarrage, reconnexion au Pi et détection locale de présence. Le délai de veille et le verrouillage configurés dans Android restent applicables pendant l’affichage. La caméra s’arrête lorsque l’écran s’éteint ou que vous quittez l’application. Le verrouillage anticipé après absence est une option distincte, désactivée par défaut et expliquée à la section 8.
+HomeDash conserve en parallèle les fonctions murales utiles : icône dédiée, ouverture automatique après redémarrage, reconnexion au Pi et détection locale de présence. Le délai de veille et le verrouillage configurés dans Android restent applicables pendant l’affichage. Le réveil de l’écran par mouvement est une option distincte, désactivée par défaut : lorsqu’elle est active, la caméra continue son analyse locale pendant que la dalle est éteinte. Le verrouillage anticipé après absence reste une seconde option indépendante. Les deux sont expliquées à la section 8.
 
 ## Repères : sur quel appareil exécuter chaque action ?
 
@@ -329,35 +329,39 @@ Android tourne immédiatement l’activité. HomeDash applique automatiquement :
 
 La transformation responsive n’écrase pas la disposition 48 colonnes enregistrée tant que le mode édition n’est pas activé.
 
-## 8. Configurer la veille et le verrouillage de l’écran
+## 8. Configurer la veille, le réveil par mouvement et le verrouillage
 
-HomeDash `0.3.0` ne force plus l’écran à rester allumé. Le délai choisi dans Android s’applique donc normalement, même quand le dashboard est ouvert et que la tablette est branchée.
+HomeDash ne force pas l’écran à rester allumé. Le délai choisi dans Android s’applique normalement, même quand le dashboard est ouvert et que la tablette est branchée.
 
-**[TABLETTE — Android]** Pour obtenir une extinction après une minute suivie du verrouillage :
+### Activer le réveil de l’écran par mouvement
 
-1. ouvrez **Paramètres > Affichage > Veille** et choisissez **1 minute** ;
-2. ouvrez **Paramètres > Sécurité > Verrouillage de l’écran**, configurez votre PIN, schéma ou mot de passe, puis choisissez le verrouillage immédiat après la mise en veille si cette option existe ;
-3. si les **Options pour les développeurs** sont activées, désactivez **Rester activé / Écran toujours allumé pendant la charge** ;
-4. désactivez l’économiseur d’écran Android s’il affiche des photos ou une horloge au lieu d’éteindre la dalle ;
-5. rouvrez HomeDash et ne touchez plus l’écran pendant un peu plus d’une minute ;
-6. réveillez ensuite la tablette avec son bouton, un double toucher ou le geste prévu par son constructeur : Android doit afficher son écran de verrouillage.
+Cette fonction compare environ deux fois par seconde de minuscules trames en niveaux de gris provenant de la caméra frontale. La comparaison et la détection ont lieu uniquement en mémoire sur la tablette : aucune photo ni vidéo n’est créée, conservée ou transmise. Lorsque l’écran est éteint, la détection attend deux secondes avant de s’armer afin d’ignorer le changement d’exposition de la caméra, puis rallume la dalle si une partie significative de l’image change.
 
-HomeDash ne réveille plus automatiquement la dalle lorsqu’un visage est détecté et ne s’affiche plus par-dessus l’écran verrouillé. La détection de présence reprend uniquement après votre déverrouillage et le retour dans l’application.
+**[TABLETTE — Android]** Configuration conseillée :
 
-Dans votre cas, aucune autorisation HomeDash supplémentaire n’est nécessaire : laissez l’option **Extinction après 90 secondes** désactivée et utilisez simplement le délai Android d’une minute.
+1. ouvrez **Paramètres Android > Affichage > Veille** et choisissez le délai souhaité, par exemple **1 minute** ;
+2. si les **Options pour les développeurs** sont actives, désactivez **Rester activé / Écran toujours allumé pendant la charge** ; désactivez aussi l’économiseur d’écran s’il remplace l’extinction par des photos ou une horloge ;
+3. ouvrez l’application HomeDash, puis **Paramètres HomeDash > Affichage tablette > Réveil de l’écran par mouvement** ; cette option n’existe pas dans Chrome, seulement dans l’APK ;
+4. touchez **Activer le réveil par mouvement**, puis accordez l’autorisation **Caméra** et, sur Android 13 ou ultérieur, la **Notification** ;
+5. touchez **Autoriser l’activité sans restriction** et acceptez l’exclusion d’optimisation de batterie ; selon le fabricant, activez aussi **Démarrage automatique**, **Activité en arrière-plan** ou **Application protégée** pour HomeDash ;
+6. laissez HomeDash affiché, attendez l’extinction normale, patientez au moins deux secondes, puis passez devant la caméra frontale ; la dalle doit se rallumer en moins d’une seconde environ ;
+7. effectuez plusieurs essais à la distance et avec l’éclairage réels avant de fixer la tablette au mur.
 
-### Option facultative : verrouiller après 90 secondes d’absence
+Pendant le fonctionnement, Android affiche son voyant de confidentialité caméra et une notification permanente **HomeDash actif**. Le service conserve le processeur et la caméra actifs alors que seule la dalle est éteinte. Cela consomme davantage d’énergie et peut chauffer : cette fonction est destinée à une tablette murale branchée, à valider pendant au moins 48 heures.
 
-Une application Android ordinaire ne peut pas éteindre directement la dalle. HomeDash peut demander l’autorisation Android standard **Administrateur de l’appareil** afin d’appeler uniquement le verrouillage après 90 secondes sans visage détecté. Cette option sert à verrouiller plus tôt qu’un délai Android plus long ; le délai Android reste toujours prioritaire.
+Le bouton **Android** arrête volontairement la caméra et le service. Le réglage reste mémorisé, mais il faut rouvrir HomeDash pour réarmer la détection. Android impose aussi que le service caméra soit démarré pendant que l’application est visible ; après un redémarrage ou si le constructeur tue l’application, ouvrez HomeDash une fois si la détection n’a pas repris. Certaines ROMs ferment malgré tout la caméra écran éteint : dans ce cas, vérifiez d’abord les réglages batterie/démarrage automatique, puis considérez la fonction comme incompatible avec cette ROM si le problème persiste.
 
-Cette option :
+### Ce que signifie « réveiller », et non « déverrouiller »
 
-- est désactivée par défaut ;
-- n’est pas le mode **Device Owner** ;
-- n’active ni `lock task`, ni remplacement du lanceur ;
-- ne modifie pas le plein écran immersif normal de HomeDash ; Retour et Accueil restent accessibles en glissant depuis le bord inférieur ;
-- ne réveille pas automatiquement l’écran ;
-- ne fonctionne que lorsque HomeDash est ouvert ; la caméra et le service s’arrêtent dès que l’écran s’éteint ou que vous quittez l’application.
+HomeDash rallume physiquement la dalle, comme un appui sur le bouton d’alimentation. Il ne contourne jamais un PIN, un schéma, un mot de passe, le chiffrement ou l’écran de verrouillage Android.
+
+- pour revoir directement le dashboard, utilisez l’absence de verrouillage sécurisé ou un délai de verrouillage adapté à votre usage et à votre environnement ;
+- avec un verrouillage immédiat, le mouvement rallume correctement la dalle mais Android présente son écran de verrouillage ;
+- HomeDash ne s’affiche pas par-dessus un écran verrouillé et ne devient ni **Device Owner**, ni lanceur système.
+
+### Option indépendante : verrouiller après 90 secondes d’absence
+
+HomeDash peut demander l’autorisation Android standard **Administrateur de l’appareil** afin d’appeler uniquement le verrouillage après 90 secondes sans visage détecté. Cette option sert à verrouiller plus tôt qu’un délai Android plus long. Elle n’est pas requise pour le réveil par mouvement et reste désactivée par défaut.
 
 Pour l’activer :
 
@@ -365,12 +369,11 @@ Pour l’activer :
 2. touchez **Activer l’extinction après 90 secondes** ;
 3. lisez l’écran Android puis accordez l’autorisation à HomeDash ;
 4. pour isoler ce test, réglez temporairement la veille Android sur plus de deux minutes ;
-5. revenez au dashboard, quittez le champ de la caméra et vérifiez le verrouillage après environ 90 secondes ;
-6. réveillez et déverrouillez ensuite la tablette normalement.
+5. revenez au dashboard, quittez le champ de la caméra et vérifiez le verrouillage après environ 90 secondes.
 
-Si la tablette possède un verrouillage sécurisé, Android affiche normalement l’écran de verrouillage au réveil. HomeDash ne contourne pas cette sécurité.
+Si les deux options sont actives, l’absence peut verrouiller la tablette puis un mouvement peut rallumer la dalle ; Android présente alors normalement son écran de verrouillage. Pour retirer l’option d’absence, revenez au même écran et touchez **Désactiver l’extinction après 90 secondes**. Si la ROM ne retire pas l’autorisation, faites-le dans **Paramètres Android > Sécurité > Applications d’administration de l’appareil**.
 
-Pour la désactiver, revenez au même écran et touchez **Désactiver l’extinction après 90 secondes**. HomeDash désactive alors la fonction et retire sa propre autorisation d’administration. Si la ROM ne la retire pas, faites-le dans **Paramètres Android > Sécurité > Applications d’administration de l’appareil**.
+Références de plateforme : [services caméra au premier plan](https://developer.android.com/develop/background-work/services/fgs/service-types), [restrictions de démarrage en arrière-plan](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start), [optimisation de batterie et Doze](https://developer.android.com/training/monitoring-device-state/doze-standby) et [API PowerManager](https://developer.android.com/reference/android/os/PowerManager).
 
 ## 9. Entrer et sortir de HomeDash au quotidien
 
@@ -469,6 +472,9 @@ Validez chaque point :
 - **Bouton de mise à jour tablette absent** : l’APK installée est antérieure à `0.3.0`, la tablette n’est plus associée, ou la Release ne contient pas l’APK et son SHA‑256.
 - **Barres Android impossibles à afficher** : commencez le geste exactement sur le bord inférieur et glissez vers le centre ; le bouton **Android** du dashboard reste la sortie de secours permanente.
 - **Caméra inactive après retour** : rouvrez HomeDash et contrôlez la permission caméra dans les paramètres Android.
+- **Le mouvement ne rallume pas la dalle** : vérifiez que l’option est active dans l’APK, que la notification **HomeDash actif** reste présente écran éteint, puis passez la batterie à **Sans restriction** et autorisez le démarrage automatique. Si l’indicateur caméra disparaît dès l’extinction malgré ces réglages, la ROM suspend la caméra et doit être testée avec une mise à jour constructeur ou une autre tablette.
+- **La dalle se rallume mais demande un code** : le réveil fonctionne ; le code est le verrouillage Android normal. HomeDash ne le contourne pas. Adaptez le délai de verrouillage système uniquement si le niveau de sécurité du lieu le permet.
+- **Faux réveils au changement de lumière** : évitez de placer la caméra face à une fenêtre ou une source lumineuse instable et testez avec l’éclairage définitif. Le changement uniforme d’exposition est filtré, mais une ombre mobile importante reste volontairement considérée comme un mouvement.
 - **L’écran ne s’éteint jamais** : vérifiez que l’APK `0.3.0` ou ultérieure est installée, contrôlez **Affichage > Veille**, désactivez **Rester activé pendant la charge** dans les Options pour les développeurs et désactivez l’économiseur d’écran.
 - **Le verrouillage facultatif après 90 secondes ne fonctionne pas** : vérifiez l’autorisation Administrateur de l’appareil et testez la caméra en lumière réelle.
 - **Un code Android apparaît au réveil** : c’est le verrouillage système normal. Désactivez l’extinction automatique si ce comportement ne vous convient pas.

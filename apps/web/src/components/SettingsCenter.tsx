@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
+  BatteryCharging,
   CalendarDays,
+  Camera,
   Download,
   ExternalLink,
   Link2,
@@ -15,12 +17,19 @@ import type { TabletDevice } from '@homedash/contracts';
 import {
   getDashboardOrientation,
   getAndroidAppVersion,
+  getMotionWakeStatus,
   hasAndroidBridge,
   installAndroidUpdate,
+  openAndroidPermissionSettings,
   openAndroidAppSettings,
+  openBatteryOptimizationSettings,
+  requestMotionWakePermission,
   setDashboardOrientation,
+  setMotionWakeEnabled,
   supportsAndroidUpdates,
+  supportsMotionWake,
   type DashboardOrientation,
+  type MotionWakeStatus,
 } from '../android-bridge';
 import { api } from '../api';
 
@@ -66,7 +75,9 @@ export function SettingsCenter({
   const isAndroidApp = hasAndroidBridge();
   const androidAppVersion = isAndroidApp ? getAndroidAppVersion() : null;
   const androidUpdaterSupported = isAndroidApp && supportsAndroidUpdates();
+  const motionWakeSupported = isAndroidApp && supportsMotionWake();
   const [orientation, setOrientation] = useState<DashboardOrientation | null>(null);
+  const [motionWake, setMotionWake] = useState<MotionWakeStatus | null>(null);
   const [androidUpdateStarted, setAndroidUpdateStarted] = useState(false);
   const [serverUpdateStarted, setServerUpdateStarted] = useState(false);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
@@ -123,6 +134,20 @@ export function SettingsCenter({
   }, [isAndroidApp]);
 
   useEffect(() => {
+    if (!motionWakeSupported) return;
+    const refresh = () => setMotionWake(getMotionWakeStatus());
+    refresh();
+    window.addEventListener('focus', refresh);
+    window.addEventListener('homedash:motion-wake-status', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('homedash:motion-wake-status', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [motionWakeSupported]);
+
+  useEffect(() => {
     if (updateStatus.data?.state !== 'complete') return;
     const timer = window.setTimeout(() => window.location.reload(), 1_500);
     return () => window.clearTimeout(timer);
@@ -131,6 +156,11 @@ export function SettingsCenter({
   function changeOrientation(value: DashboardOrientation) {
     setOrientation(value);
     setDashboardOrientation(value);
+  }
+
+  function changeMotionWake(enabled: boolean) {
+    setMotionWakeEnabled(enabled);
+    setMotionWake((current) => (current ? { ...current, enabled } : current));
   }
 
   const androidReleaseVersion = updates.data?.android.version ?? null;
@@ -193,6 +223,117 @@ export function SettingsCenter({
               <span className="orientation-preview orientation-preview--portrait" />
               Portrait
             </button>
+          </div>
+          <div className="motion-wake-card">
+            <div className="motion-wake-card__heading">
+              <Camera size={20} />
+              <div>
+                <strong>Réveil de l’écran par mouvement</strong>
+                <p>
+                  La caméra frontale compare des images en basse résolution sur la tablette. Aucune
+                  image n’est enregistrée ni envoyée au Raspberry Pi.
+                </p>
+              </div>
+            </div>
+            {!motionWakeSupported && (
+              <p className="form-hint">
+                Installez la prochaine version de l’application Android pour activer cette fonction.
+              </p>
+            )}
+            {motionWakeSupported && motionWake && !motionWake.supported && (
+              <p className="text-danger">
+                Aucune caméra frontale n’a été détectée sur cette tablette.
+              </p>
+            )}
+            {motionWakeSupported && motionWake?.supported && (
+              <>
+                <button
+                  className={`button ${motionWake.enabled ? 'button--ghost' : 'button--primary'}`}
+                  aria-pressed={motionWake.enabled}
+                  onClick={() => changeMotionWake(!motionWake.enabled)}
+                >
+                  <Camera size={17} />
+                  {motionWake.enabled
+                    ? 'Désactiver le réveil par mouvement'
+                    : 'Activer le réveil par mouvement'}
+                </button>
+                <div className="motion-wake-status" aria-label="État des autorisations Android">
+                  <span className={motionWake.cameraGranted ? 'is-ready' : 'is-warning'}>
+                    Caméra {motionWake.cameraGranted ? 'autorisée' : 'à autoriser'}
+                  </span>
+                  <span
+                    className={motionWake.batteryOptimizationsIgnored ? 'is-ready' : 'is-warning'}
+                  >
+                    Batterie{' '}
+                    {motionWake.batteryOptimizationsIgnored ? 'sans restriction' : 'à configurer'}
+                  </span>
+                  <span className={motionWake.notificationGranted ? 'is-ready' : 'is-warning'}>
+                    Notification {motionWake.notificationGranted ? 'autorisée' : 'masquée'}
+                  </span>
+                </div>
+                {!motionWake.cameraGranted && (
+                  <div className="button-row">
+                    {motionWake.enabled && (
+                      <button
+                        className="button button--primary"
+                        onClick={requestMotionWakePermission}
+                      >
+                        Autoriser la caméra
+                      </button>
+                    )}
+                    <button
+                      className="button button--ghost"
+                      onClick={openAndroidPermissionSettings}
+                    >
+                      Autorisations Android
+                    </button>
+                  </div>
+                )}
+                {motionWake.enabled && !motionWake.batteryOptimizationsIgnored && (
+                  <button
+                    className="button button--ghost motion-wake-card__battery"
+                    onClick={openBatteryOptimizationSettings}
+                  >
+                    <BatteryCharging size={17} />
+                    Autoriser l’activité sans restriction
+                  </button>
+                )}
+                {motionWake.enabled && !motionWake.notificationGranted && (
+                  <button className="button button--ghost" onClick={openAndroidPermissionSettings}>
+                    Autoriser la notification permanente
+                  </button>
+                )}
+                <details className="motion-wake-guide" open={!motionWake.enabled}>
+                  <summary>Configuration conseillée sur la tablette</summary>
+                  <ol>
+                    <li>
+                      Dans Android, choisissez le délai souhaité sous{' '}
+                      <strong>Affichage &gt; Veille</strong> et désactivez « écran toujours allumé
+                      pendant la charge ».
+                    </li>
+                    <li>
+                      Activez l’option ci-dessus, puis accordez la caméra et la notification du
+                      service.
+                    </li>
+                    <li>
+                      Passez la batterie de HomeDash à <strong>Sans restriction</strong> et
+                      autorisez son démarrage automatique si le fabricant propose ce réglage.
+                    </li>
+                    <li>
+                      Un code, un schéma ou un verrouillage immédiat reste prioritaire : HomeDash
+                      rallume la dalle mais ne contourne jamais l’écran de verrouillage Android.
+                    </li>
+                  </ol>
+                </details>
+                {motionWake.enabled && (
+                  <p className="form-hint">
+                    Le voyant confidentialité d’Android et une notification restent visibles pendant
+                    l’utilisation de la caméra. Cette fonction augmente la consommation électrique ;
+                    elle est conçue pour une tablette murale branchée.
+                  </p>
+                )}
+              </>
+            )}
           </div>
           <button className="button button--ghost" onClick={openAndroidAppSettings}>
             <ExternalLink size={17} />

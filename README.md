@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.0` fournit déjà :
+La version `0.4.1` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -18,6 +18,7 @@ La version `0.4.0` fournit déjà :
 - CI GitHub, tests TypeScript, archive native et Release Android signée.
 - mise à jour de l’APK directement depuis les paramètres HomeDash, via un cache vérifié sur le Pi ;
 - widgets météo quotidiens et horaires avec courbes de température colorées, et prévisions horaires continues après minuit ;
+- pictogrammes météo multicolores et réveil facultatif de la dalle par mouvement devant la caméra frontale, traité localement sans enregistrement d’image ;
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 

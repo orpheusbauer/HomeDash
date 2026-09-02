@@ -90,7 +90,7 @@ export function CurrentWeatherWidget({ instance }: WidgetComponentProps) {
       </div>
       <div className="weather-current__meta">
         <span>
-          <Droplets size={17} />
+          <Droplets className="weather-water-icon" size={17} />
           {weather.current.humidity ?? '—'} %
         </span>
         <span>
@@ -220,7 +220,7 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
             <WeatherIcon code={hour.weatherCode} size={28} />
             <strong>{Math.round(hour.temperature)}°</strong>
             <span className="hourly-weather-rain">
-              <Droplets size={13} />
+              <Droplets className="weather-water-icon" size={13} />
               {hour.humidity ?? '—'}%
             </span>
           </div>

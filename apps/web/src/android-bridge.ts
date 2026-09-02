@@ -1,4 +1,11 @@
 export type DashboardOrientation = 'landscape' | 'portrait';
+export type MotionWakeStatus = {
+  supported: boolean;
+  enabled: boolean;
+  cameraGranted: boolean;
+  notificationGranted: boolean;
+  batteryOptimizationsIgnored: boolean;
+};
 
 interface HomeDashAndroidBridge {
   getOrientation(): string;
@@ -7,6 +14,11 @@ interface HomeDashAndroidBridge {
   exitToAndroid(): void;
   getAppVersion?: () => string;
   installAndroidUpdate?: (version: string) => void;
+  getMotionWakeStatus?: () => string;
+  setMotionWakeEnabled?: (enabled: boolean) => void;
+  requestMotionWakePermission?: () => void;
+  openBatteryOptimizationSettings?: () => void;
+  openAppPermissionSettings?: () => void;
 }
 
 declare global {
@@ -46,4 +58,47 @@ export function supportsAndroidUpdates(): boolean {
 
 export function installAndroidUpdate(version: string): void {
   window.HomeDashAndroid?.installAndroidUpdate?.(version);
+}
+
+export function supportsMotionWake(): boolean {
+  return (
+    typeof window.HomeDashAndroid?.getMotionWakeStatus === 'function' &&
+    typeof window.HomeDashAndroid?.setMotionWakeEnabled === 'function'
+  );
+}
+
+export function getMotionWakeStatus(): MotionWakeStatus | null {
+  try {
+    const raw = window.HomeDashAndroid?.getMotionWakeStatus?.();
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<MotionWakeStatus>;
+    if (
+      typeof parsed.supported !== 'boolean' ||
+      typeof parsed.enabled !== 'boolean' ||
+      typeof parsed.cameraGranted !== 'boolean' ||
+      typeof parsed.notificationGranted !== 'boolean' ||
+      typeof parsed.batteryOptimizationsIgnored !== 'boolean'
+    ) {
+      return null;
+    }
+    return parsed as MotionWakeStatus;
+  } catch {
+    return null;
+  }
+}
+
+export function setMotionWakeEnabled(enabled: boolean): void {
+  window.HomeDashAndroid?.setMotionWakeEnabled?.(enabled);
+}
+
+export function requestMotionWakePermission(): void {
+  window.HomeDashAndroid?.requestMotionWakePermission?.();
+}
+
+export function openBatteryOptimizationSettings(): void {
+  window.HomeDashAndroid?.openBatteryOptimizationSettings?.();
+}
+
+export function openAndroidPermissionSettings(): void {
+  window.HomeDashAndroid?.openAppPermissionSettings?.();
 }

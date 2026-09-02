@@ -12,6 +12,7 @@ Ce document est la procédure courte et ordonnée à suivre maintenant que le Ra
 - l’icône HomeDash permet de le relancer à tout moment ;
 - le plein écran masque les barres système, un glissement inférieur rappelle Accueil/Retour/Récentes, le bouton **Android** quitte directement l’application et le délai de veille Android reste actif ;
 - portrait/paysage se choisit depuis les paramètres ;
+- le réveil facultatif de la dalle par mouvement se configure depuis les paramètres de l’APK ;
 - les futures versions du Pi proviennent des Releases GitHub ;
 - les futures APK signées s’installent depuis les paramètres HomeDash, sans ADB, GitHub sur la tablette, nouveau certificat ou perte d’association.
 
@@ -155,7 +156,7 @@ Depuis Chrome sur la tablette :
 5. accordez caméra et notifications ;
 6. configurez batterie **Sans restriction** et **Démarrage automatique** dans Android.
 
-Le délai de veille configuré dans Android fonctionne directement avec HomeDash `0.3.0`. Le verrouillage anticipé après 90 secondes d’absence reste facultatif. Activez-le depuis l’écran natif uniquement après avoir lu la section 8 de [android-kiosk.md](android-kiosk.md) : il utilise une autorisation Android standard, jamais Device Owner ou le verrouillage kiosque.
+Le délai de veille configuré dans Android fonctionne directement avec HomeDash. Le réveil par mouvement et le verrouillage anticipé après 90 secondes d’absence sont deux fonctions facultatives et indépendantes. Configurez-les uniquement après avoir lu la section 8 de [android-kiosk.md](android-kiosk.md) : le réveil maintient un service caméra local actif, tandis que le verrouillage utilise une autorisation Android standard, jamais Device Owner ou le verrouillage kiosque.
 
 ### C4. Tester les sorties avant le montage
 
@@ -166,8 +167,9 @@ Vérifiez séparément :
 - glissement depuis le bord inférieur puis bouton rond Accueil ;
 - relance par l’icône HomeDash ;
 - arrêt de l’indicateur caméra après la sortie ;
-- retour du service de présence après réouverture.
+- retour du service de présence après réouverture ;
 - extinction selon le délai Android, puis affichage normal de l’écran de verrouillage au réveil ;
+- si le réveil par mouvement est activé : notification permanente, extinction normale, réveil devant la caméra et comportement du verrouillage validés ;
 - si le verrouillage après absence est activé : verrouillage anticipé et désactivation possible de l’autorisation.
 
 Ne montez pas la tablette au mur si l’un de ces chemins ne fonctionne pas.

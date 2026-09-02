@@ -45,7 +45,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.0` et `versionCode = 7`.
+Pour la présente release, les valeurs attendues sont `0.4.1` et `versionCode = 8`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -80,7 +80,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.0: graphiques météo et mises à jour intégrées"
+git commit -m "Release 0.4.1: icônes météo et réveil par mouvement"
 git push origin main
 ```
 
@@ -105,8 +105,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.0 -m "HomeDash 0.4.0"
-git push origin v0.4.0
+git tag -a v0.4.1 -m "HomeDash 0.4.1"
+git push origin v0.4.1
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -122,13 +122,13 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.0**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.1**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.0.tar.gz
-homedash-native-0.4.0.tar.gz.sha256
-homedash-kiosk-0.4.0.apk
-homedash-kiosk-0.4.0.apk.sha256
+homedash-native-0.4.1.tar.gz
+homedash-native-0.4.1.tar.gz.sha256
+homedash-kiosk-0.4.1.apk
+homedash-kiosk-0.4.1.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.

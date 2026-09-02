@@ -828,6 +828,84 @@ button {
   letter-spacing: 0.16em;
 }
 
+.motion-wake-card {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface-soft);
+}
+
+.motion-wake-card__heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.motion-wake-card__heading > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+.motion-wake-card__heading strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.motion-wake-card__heading p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.motion-wake-card__battery {
+  justify-self: start;
+}
+
+.motion-wake-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.motion-wake-status span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.motion-wake-status .is-ready {
+  color: #16623b;
+  background: #dff4e8;
+}
+
+.motion-wake-status .is-warning {
+  color: #8a4a08;
+  background: #fff0d7;
+}
+
+.motion-wake-guide {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.motion-wake-guide summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.motion-wake-guide ol {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 22px;
+}
+
 .settings-list span {
   color: var(--muted);
 }
@@ -961,8 +1039,58 @@ button {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 24px;
-  color: #d7852d;
   background: #fff1d9;
+}
+
+.weather-icon {
+  display: block;
+  overflow: visible;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.weather-icon__sun {
+  fill: #fbbf24;
+  stroke: #d99000;
+  stroke-width: 1.65;
+}
+
+.weather-icon__cloud {
+  fill: #d8dee6;
+  stroke: #737f8c;
+  stroke-width: 1.65;
+}
+
+.weather-icon__moon {
+  fill: #c4b5fd;
+  stroke: #7467a8;
+  stroke-width: 1.5;
+}
+
+.weather-icon__rain,
+.weather-water-icon {
+  color: #2f88d8;
+  fill: none;
+  stroke: #2f88d8;
+  stroke-width: 1.75;
+}
+
+.weather-icon__fog {
+  fill: none;
+  stroke: #89939e;
+  stroke-width: 1.65;
+}
+
+.weather-icon__snow {
+  fill: none;
+  stroke: #68b9e8;
+  stroke-width: 1.4;
+}
+
+.weather-icon__lightning {
+  fill: #f6c445;
+  stroke: #c78300;
+  stroke-width: 1.25;
 }
 
 .weather-current__temperature {
