@@ -1,7 +1,17 @@
 import type { ApiErrorPayload } from '@homedash/contracts';
 
-sessionStorage.removeItem('homedash.adminToken');
-let adminSession = sessionStorage.getItem('homedash.adminSession') ?? '';
+function getSessionStorage(): Storage | undefined {
+  try {
+    return typeof window === 'undefined' ? undefined : window.sessionStorage;
+  } catch {
+    // Storage can also be unavailable in restricted browser contexts.
+    return undefined;
+  }
+}
+
+const browserSessionStorage = getSessionStorage();
+browserSessionStorage?.removeItem('homedash.adminToken');
+let adminSession = browserSessionStorage?.getItem('homedash.adminSession') ?? '';
 
 export class ApiError extends Error {
   constructor(
@@ -17,8 +27,8 @@ export class ApiError extends Error {
 
 export function setAdminSession(token: string): void {
   adminSession = token;
-  if (token) sessionStorage.setItem('homedash.adminSession', token);
-  else sessionStorage.removeItem('homedash.adminSession');
+  if (token) browserSessionStorage?.setItem('homedash.adminSession', token);
+  else browserSessionStorage?.removeItem('homedash.adminSession');
 }
 
 export function hasAdminSession(): boolean {

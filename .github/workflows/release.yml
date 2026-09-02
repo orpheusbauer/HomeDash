@@ -11,8 +11,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -25,12 +25,12 @@ jobs:
           test "$(cat VERSION)" = "$VERSION"
           bash deployment/raspberry-pi-zero/package-native.sh "$VERSION" "$RUNNER_TEMP/native-release"
           cp "$RUNNER_TEMP/native-release/"* .
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: 8.10.2
       - name: Prepare Android release signing
