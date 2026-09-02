@@ -129,7 +129,11 @@ if [[ ! -d "${RELEASE_DIRECTORY}" ]]; then
     cd "${staged_release}"
     export NODE_OPTIONS="--max-old-space-size=192"
     export npm_config_jobs=1
+    # ProtectHome=true masque /root dans le service : le cache npm par défaut
+    # (/root/.npm) y échoue avec ENOENT (code 254). Ce cache privé est accessible
+    # avec PrivateTmp=true et supprimé par cleanup, sans remplir durablement la SD.
     /usr/local/bin/npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
+      --cache "${temporary_directory}/npm-cache" --userconfig /dev/null \
       --workspace @homedash/server
   )
   chown -R root:homedash "${staged_release}"

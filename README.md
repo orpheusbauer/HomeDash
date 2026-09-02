@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.4` fournit déjà :
+La version `0.4.5` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -23,7 +23,10 @@ La version `0.4.4` fournit déjà :
 - lecture de l’adresse WebView sur le thread principal avant le téléchargement APK, avec test de régression dédié (correctif 0.4.4) ;
 - édition stable dans une grille de référence unique, sauvegarde complète attendue par **Terminer**, reprise des gestes tactiles annulés ;
 - diagnostic des images caméra, reprise automatique et analyse indépendante du réseau ;
-- installation automatique des releases natives sur le Pi toutes les dix minutes, sans tablette ouverte ni SSH (après activation par une première mise à jour 0.4.3).
+- installation automatique des releases natives sur le Pi toutes les dix minutes, sans tablette ouverte ni SSH pour les releases applicatives suivantes ;
+- cache npm temporaire compatible avec les protections du service natif, erreurs npm détaillées et test sous `systemd` isolé (correctif 0.4.5).
+
+**Transition 0.4.5 : installeur complet requis une fois sur le Pi**, car le correctif remplace l’installateur privilégié déjà présent. Publier la release seule ne répare pas ce script. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 

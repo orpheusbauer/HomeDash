@@ -75,6 +75,41 @@ describe('installation automatique du Pi', () => {
     stop();
   });
 
+  it('explique une suspension une fois par tentative échouée, sans inonder le journal', async () => {
+    const { deps, logger, options } = setup();
+    deps.status.mockResolvedValue({
+      state: 'failed',
+      targetVersion: '0.4.3',
+      jobId: 'first',
+      error: 'npm error path /root/.npm',
+    });
+    const stop = startAutomaticUpdates(logger, deps, options);
+    await vi.advanceTimersByTimeAsync(1_260_000);
+    expect(deps.install).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('/root/.npm'));
+    deps.status.mockResolvedValue({
+      state: 'failed',
+      targetVersion: '0.4.3',
+      jobId: 'manual-retry',
+    });
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(logger.warn).toHaveBeenCalledTimes(2);
+    stop();
+  });
+
+  it('détecte aussi un échec survenu pendant la requête GitHub', async () => {
+    const { deps, logger, options } = setup();
+    deps.status.mockResolvedValueOnce({ state: 'idle' }).mockResolvedValue({
+      state: 'failed',
+      targetVersion: '0.4.3',
+    });
+    const stop = startAutomaticUpdates(logger, deps, options);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(deps.install).not.toHaveBeenCalled();
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    stop();
+  });
+
   it('réessaie après une coupure réseau sans installations concurrentes', async () => {
     const { deps, logger, options } = setup();
     deps.check.mockRejectedValueOnce(new Error('offline'));

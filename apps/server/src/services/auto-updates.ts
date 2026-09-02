@@ -2,7 +2,12 @@ import { existsSync } from 'node:fs';
 import { config } from '../config.js';
 import { checkForUpdates, installUpdate, updaterRequest } from './updates.js';
 
-export type NativeUpdateStatus = { state: string; targetVersion?: string };
+export type NativeUpdateStatus = {
+  state: string;
+  targetVersion?: string;
+  jobId?: string;
+  error?: string | null;
+};
 type UpdateLogger = {
   info: (message: string) => void;
   warn: (message: string) => void;
@@ -25,7 +30,20 @@ export function startAutomaticUpdates(
 ): () => void {
   if (!options.enabled) return () => {};
   let stopped = false;
+  let warnedJob: string | undefined;
   let timer: ReturnType<typeof setTimeout>;
+  const blockedByFailure = (status: NativeUpdateStatus, version: string): boolean => {
+    if (!['failed', 'interrupted'].includes(status.state) || status.targetVersion !== version)
+      return false;
+    const job = `${version}:${status.jobId ?? status.state}`;
+    if (warnedJob !== job) {
+      warnedJob = job;
+      logger.warn(
+        `Mise à jour automatique ${version} suspendue après échec ; une nouvelle release ou une relance manuelle est nécessaire. ${status.error ?? 'Consultez /var/lib/homedash/data/native-update.log.'}`,
+      );
+    }
+    return true;
+  };
   const check = async () => {
     try {
       if (!dependencies.available()) return;
@@ -35,18 +53,13 @@ export function startAutomaticUpdates(
       if (stopped || !release.updateAvailable || !release.installable || !release.manifest) return;
       // The root agent persists failures across application restarts/rollbacks.
       // Do not reinstall a broken release in a loop; a manual retry stays possible.
-      if (
-        ['failed', 'interrupted'].includes(status.state) &&
-        status.targetVersion === release.manifest.version
-      )
-        return;
+      if (blockedByFailure(status, release.manifest.version)) return;
       // Re-read after the network request: a manual installation may have started.
       const latestStatus = await dependencies.status();
       if (
         stopped ||
         latestStatus.state === 'installing' ||
-        (['failed', 'interrupted'].includes(latestStatus.state) &&
-          latestStatus.targetVersion === release.manifest.version)
+        blockedByFailure(latestStatus, release.manifest.version)
       )
         return;
       logger.info(`Installation automatique de HomeDash ${release.manifest.version}`);

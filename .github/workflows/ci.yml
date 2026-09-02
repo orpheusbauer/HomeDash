@@ -27,6 +27,17 @@ jobs:
       - run: npm run build
       - name: Verify Raspberry Pi deployment safeguards
         run: bash deployment/raspberry-pi-zero/test-deployment.sh
+      - name: Verify npm under native updater systemd isolation
+        run: |
+          SMOKE_DIRECTORY="$(sudo mktemp -d /opt/homedash-updater-test.XXXXXX)"
+          trap 'sudo rm -rf -- "$SMOKE_DIRECTORY"' EXIT
+          sudo install -m 0644 deployment/raspberry-pi-zero/{update-native.sh,test-native-update-cache.sh} "$SMOKE_DIRECTORY/"
+          sudo systemd-run --wait --pipe --collect \
+            -p ProtectHome=true -p PrivateTmp=true -p NoNewPrivileges=true \
+            -p ProtectKernelTunables=true -p ProtectKernelModules=true \
+            -p ProtectControlGroups=true -p RestrictSUIDSGID=true -p LockPersonality=true \
+            --setenv="PATH=$(dirname "$(command -v node)"):/usr/bin:/bin" \
+            /bin/bash "$SMOKE_DIRECTORY/test-native-update-cache.sh" --protected-home
       - name: Verify native release packaging
         run: |
           bash deployment/raspberry-pi-zero/package-native.sh 0.0.0 "$RUNNER_TEMP/native-package"

@@ -10,6 +10,8 @@ La version `0.4.3` corrige la disposition tactile et le service caméra et activ
 
 La version `0.4.4` corrige l’erreur **A WebView method was called on thread 'DefaultDispatcher-worker-…'** de l’installateur Android : l’adresse affichée par la WebView est maintenant lue sur le thread principal, avant le téléchargement en arrière-plan. Les nouvelles tentatives réutilisent cette même adresse. **Si cette erreur apparaît dans l’APK déjà installée, installez manuellement l’APK signée 0.4.4 une fois**, selon la procédure de dépannage ci-dessous ; une mise à jour du serveur ne peut pas corriger le code natif de l’ancienne APK.
 
+La version `0.4.5` corrige l’installation automatique du Pi : npm utilisait `/root/.npm`, inaccessible depuis le service protégé par `ProtectHome=true`. Un cache temporaire privé est maintenant passé explicitement à npm et nettoyé après l’installation. Le statut et le journal donnent aussi l’erreur npm réelle, et la boucle explique la suspension d’une version ayant échoué. **Installeur complet 0.4.5 requis une fois en SSH** : la publication d’une nouvelle archive applicative ne remplace pas le script privilégié déjà installé. Suivez la réparation ci-dessous après publication de `v0.4.5`.
+
 ## Vue d’ensemble
 
 Une mise à jour comporte deux éléments distincts :
@@ -51,7 +53,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.4` et `versionCode = 11`.
+Pour la présente release, les valeurs attendues sont `0.4.5` et `versionCode = 12`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -86,7 +88,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.4: correction du thread WebView de l’installateur Android"
+git commit -m "Release 0.4.5: correction du cache npm de l’installateur natif"
 git push origin main
 ```
 
@@ -111,8 +113,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.4 -m "HomeDash 0.4.4"
-git push origin v0.4.4
+git tag -a v0.4.5 -m "HomeDash 0.4.5"
+git push origin v0.4.5
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -128,16 +130,56 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.4**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.5**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.4.tar.gz
-homedash-native-0.4.4.tar.gz.sha256
-homedash-kiosk-0.4.4.apk
-homedash-kiosk-0.4.4.apk.sha256
+homedash-native-0.4.5.tar.gz
+homedash-native-0.4.5.tar.gz.sha256
+homedash-kiosk-0.4.5.apk
+homedash-kiosk-0.4.5.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
+
+Pour cette release, ajoutez aussi **Installeur complet 0.4.5 requis une fois sur le Pi** aux notes de publication, avec un lien vers la réparation ci-dessous.
+
+## Réparation unique du cache npm — installeur complet 0.4.5 requis
+
+Ce défaut concerne le service natif installé avant 0.4.5. Le journal présente notamment :
+
+```text
+npm error code ENOENT
+npm error syscall mkdir
+npm error path /root/.npm
+homedash-update-native terminé avec code 254
+```
+
+La détection GitHub a fonctionné : l’échec arrive pendant l’installation des dépendances, avant l’arrêt et le basculement du serveur. Les avertissements `ENOTEMPTY` et `TAR_ENTRY_ERROR` qui l’accompagnent sont des conséquences du nettoyage npm après cet échec. Ne supprimez pas les releases actives et ne désactivez pas `ProtectHome`.
+
+Après publication complète de **v0.4.5**, connectez-vous au Pi en SSH. Assurez-vous qu’aucune installation n’est en cours (`update-status.json` ne doit pas indiquer `installing`), puis :
+
+```bash
+cd /opt/homedash/repository
+git status --short
+git fetch --tags origin
+git checkout v0.4.5
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.5
+```
+
+Si `git status --short` montre des changements, arrêtez-vous avant le `checkout` et préservez-les. L’installeur remplace le script et l’agent natifs, puis installe le serveur 0.4.5 en conservant configuration, association, certificat et données. Sur un Zero, patientez jusqu’au message final ; ne coupez pas l’alimentation.
+
+Vérifiez ensuite :
+
+```bash
+sudo cat /var/lib/homedash/installed-version
+sudo systemctl is-active homedash homedash-native-updater nginx
+curl --fail http://127.0.0.1:4100/health/ready
+sudo journalctl -u homedash -u homedash-native-updater --since '15 minutes ago' --no-pager
+```
+
+Résultat attendu : **0.4.5**, trois services actifs et HTTP 200. Le statut JSON peut encore décrire la dernière tentative effectuée par l’agent, antérieure à cette installation SSH : le fichier `installed-version` et le contrôle de santé vérifient l’installation réelle. Pour les prochaines releases applicatives, la boucle de dix minutes peut à nouveau télécharger et installer sans SSH. Les modifications futures de l’installateur privilégié restent des transitions annoncées explicitement.
+
+Le message `Permission denied` de `cat /var/lib/homedash/installed-version` sans `sudo` est indépendant de l’échec npm : le dossier parent est volontairement protégé. Utilisez `sudo cat`, sans élargir ses permissions.
 
 ## Partie B — transition unique de 0.3.0 vers 0.4.0
 
@@ -162,7 +204,7 @@ La migration 0.4.0 conserve toutes les positions et dimensions visuelles, mais r
 Vérifiez ensuite :
 
 ```bash
-cat /var/lib/homedash/installed-version
+sudo cat /var/lib/homedash/installed-version
 sudo systemctl is-active homedash nginx homedash-native-updater
 curl --fail http://127.0.0.1:4100/health/ready
 sudo journalctl -u homedash -u homedash-native-updater --since '15 minutes ago' --no-pager
@@ -174,6 +216,8 @@ Résultat attendu : version `0.4.0`, trois services `active` et réponse HTTP 20
 
 Cette procédure s’applique après la transition serveur 0.4.0.
 
+Si le service natif a été installé avant 0.4.5, appliquez d’abord la réparation du cache npm ci-dessus.
+
 ### C0. Fonctionnement automatique à partir du serveur 0.4.3
 
 Le serveur vérifie GitHub une minute après son démarrage, puis toutes les dix minutes après chaque vérification. La tablette peut être éteinte ou déconnectée. Le Pi doit rester allumé, son service HomeDash actif et son accès Internet disponible.
@@ -183,6 +227,8 @@ Une release stable publiée avec un tag exact `vX.Y.Z`, plus récente que la ver
 Le délai de dix minutes concerne **la détection**, à compter de la publication effective de la Release par le workflow GitHub. Il faut y ajouter le téléchargement et l’installation des dépendances ; cela peut prendre plusieurs minutes sur le Pi Zero. Ne coupez pas son alimentation pendant l’installation. Ensuite, sur la tablette, **Paramètres > Mises à jour > Vérifier > Installer l’application X.Y.Z** reste la seule étape habituelle. Android demande toujours la confirmation d’installation de l’APK.
 
 Une installation déjà en cours n’est pas doublée. Si l’agent signale un échec ou une interruption, la même version n’est pas réinstallée automatiquement en boucle : corrigez et publiez une nouvelle release, ou relancez explicitement l’installation depuis la tablette après diagnostic. Une simple indisponibilité de GitHub est réessayée au passage suivant.
+
+Depuis 0.4.5, le journal signale cette suspension une fois par tentative échouée, avec la cause disponible. Le nouvel agent ajoute les lignes `npm error` au statut d’échec et à `journalctl` ; le détail intégral reste dans `native-update.log`.
 
 Les valeurs par défaut s’appliquent aussi aux fichiers de configuration existants. Pour les modifier exceptionnellement dans `/etc/homedash/homedash.env` :
 
@@ -198,7 +244,7 @@ Pour vérifier les passages de la boucle et les résultats :
 ```bash
 sudo journalctl -u homedash -u homedash-native-updater --since '30 minutes ago' --no-pager
 sudo cat /var/lib/homedash/data/update-status.json
-cat /var/lib/homedash/installed-version
+sudo cat /var/lib/homedash/installed-version
 ```
 
 ### C1. Mettre à jour le serveur Pi
