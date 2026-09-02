@@ -48,6 +48,10 @@ type UpdateStatus = {
   targetVersion?: string;
   error?: string | null;
 };
+type AndroidUpdateStatus = {
+  state: 'downloading' | 'permission-required' | 'installer-opened' | 'failed';
+  message?: string;
+};
 
 const formatBytes = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} Mo`;
 
@@ -79,6 +83,7 @@ export function SettingsCenter({
   const [orientation, setOrientation] = useState<DashboardOrientation | null>(null);
   const [motionWake, setMotionWake] = useState<MotionWakeStatus | null>(null);
   const [androidUpdateStarted, setAndroidUpdateStarted] = useState(false);
+  const [androidUpdateStatus, setAndroidUpdateStatus] = useState<AndroidUpdateStatus | null>(null);
   const [serverUpdateStarted, setServerUpdateStarted] = useState(false);
   const [pairing, setPairing] = useState<{ code: string; expiresAt: string } | null>(null);
   const updates = useQuery({
@@ -148,6 +153,18 @@ export function SettingsCenter({
   }, [motionWakeSupported]);
 
   useEffect(() => {
+    if (!isAndroidApp) return;
+    const refresh = (event: Event) => {
+      const status = (event as CustomEvent<AndroidUpdateStatus>).detail;
+      if (!status?.state) return;
+      setAndroidUpdateStatus(status);
+      setAndroidUpdateStarted(status.state !== 'failed');
+    };
+    window.addEventListener('homedash:android-update-status', refresh);
+    return () => window.removeEventListener('homedash:android-update-status', refresh);
+  }, [isAndroidApp]);
+
+  useEffect(() => {
     if (updateStatus.data?.state !== 'complete') return;
     const timer = window.setTimeout(() => window.location.reload(), 1_500);
     return () => window.clearTimeout(timer);
@@ -175,6 +192,7 @@ export function SettingsCenter({
   function startAndroidUpdate() {
     if (!androidReleaseVersion) return;
     setAndroidUpdateStarted(true);
+    setAndroidUpdateStatus({ state: 'downloading' });
     installAndroidUpdate(androidReleaseVersion);
   }
 
@@ -382,9 +400,14 @@ export function SettingsCenter({
           </div>
         )}
         <div className="button-row">
-          <button className="button button--ghost" onClick={() => void updates.refetch()}>
-            <RefreshCw size={17} />
-            Vérifier
+          <button
+            className="button button--ghost"
+            disabled={updates.isFetching}
+            aria-busy={updates.isFetching}
+            onClick={() => void updates.refetch()}
+          >
+            <RefreshCw className={updates.isFetching ? 'spin' : undefined} size={17} />
+            {updates.isFetching ? 'Vérification…' : 'Vérifier'}
           </button>
           {updates.data?.updateAvailable && updates.data.installable && updates.data.manifest && (
             <button
@@ -440,8 +463,16 @@ export function SettingsCenter({
           )}
         {isAndroidApp && androidUpdateStarted && (
           <p className="text-success">
-            Suivez les écrans Android : autorisez cette source si demandé, puis confirmez
-            l’installation. HomeDash conserve son adresse et son association.
+            {androidUpdateStatus?.state === 'downloading'
+              ? `Téléchargement et vérification de HomeDash ${androidReleaseVersion}…`
+              : (androidUpdateStatus?.message ??
+                'Suivez les écrans Android : autorisez cette source si demandé, puis confirmez l’installation. HomeDash conserve son adresse et son association.')}
+          </p>
+        )}
+        {isAndroidApp && androidUpdateStatus?.state === 'failed' && (
+          <p className="text-danger">
+            {androidUpdateStatus.message ??
+              'La préparation de la mise à jour Android a échoué. Vérifiez le Wi-Fi puis réessayez.'}
           </p>
         )}
       </section>

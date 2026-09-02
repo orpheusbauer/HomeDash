@@ -39,11 +39,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
+import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.URI
 import java.net.URL
 import java.security.MessageDigest
 
@@ -52,6 +55,7 @@ class MainActivity : ComponentActivity() {
     private var webView: WebView? = null
     private var deviceAdminRequestPending = false
     private var pendingUpdateVersion: String? = null
+    private var androidUpdateRunning = false
     private var exitingToAndroid = false
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -88,6 +92,10 @@ class MainActivity : ComponentActivity() {
         leaveLegacyKioskMode()
         hideSystemBars()
         onBackPressedDispatcher.addCallback(this) { exitToAndroid() }
+        pendingUpdateVersion =
+            preferences
+                .getString(KEY_PENDING_UPDATE_VERSION, null)
+                ?.takeIf(VERSION_PATTERN::matches)
 
         val serverUrl = preferences.getString(KEY_SERVER_URL, null)
         if (serverUrl.isNullOrBlank()) showSetup() else showDashboard(serverUrl)
@@ -119,8 +127,13 @@ class MainActivity : ComponentActivity() {
         }
         pendingUpdateVersion?.let { version ->
             if (packageManager.canRequestPackageInstalls()) {
-                pendingUpdateVersion = null
-                downloadAndInstallUpdate(version)
+                val cachedApk = updateDestination(version)
+                if (cachedApk.isFile) {
+                    clearPendingUpdate()
+                    launchUpdateInstaller(cachedApk)
+                } else {
+                    prepareAndroidUpdate(version)
+                }
             }
         }
     }
@@ -546,59 +559,101 @@ class MainActivity : ComponentActivity() {
             ).show()
             return
         }
-        if (!packageManager.canRequestPackageInstalls()) {
-            pendingUpdateVersion = version
-            Toast.makeText(
-                this,
-                "Autorisez HomeDash à installer sa mise à jour, puis revenez à l’application.",
-                Toast.LENGTH_LONG,
-            ).show()
-            runCatching {
-                startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        Uri.parse("package:$packageName"),
-                    ),
-                )
-            }.onFailure {
-                pendingUpdateVersion = null
-                Toast.makeText(this, "Réglage Android indisponible", Toast.LENGTH_LONG).show()
-            }
-            return
-        }
-        downloadAndInstallUpdate(version)
+        prepareAndroidUpdate(version)
     }
 
-    private fun downloadAndInstallUpdate(version: String) {
+    private fun prepareAndroidUpdate(version: String) {
+        if (androidUpdateRunning) return
+        androidUpdateRunning = true
+        setPendingUpdate(version)
+        dispatchAndroidUpdateStatus("downloading")
         Toast.makeText(this, "Téléchargement de HomeDash $version…", Toast.LENGTH_LONG).show()
         lifecycleScope.launch {
             try {
-                val apk = withContext(Dispatchers.IO) { downloadUpdate(version) }
-                val uri =
-                    FileProvider.getUriForFile(
-                        this@MainActivity,
-                        "$packageName.updates",
-                        apk,
+                val apk = downloadUpdateWithRetry(version)
+                if (packageManager.canRequestPackageInstalls()) {
+                    clearPendingUpdate()
+                    launchUpdateInstaller(apk)
+                } else {
+                    dispatchAndroidUpdateStatus(
+                        "permission-required",
+                        "APK vérifiée. Autorisez HomeDash à installer cette source, puis revenez à l’application.",
                     )
-                val intent =
-                    Intent(Intent.ACTION_INSTALL_PACKAGE)
-                        .setData(uri)
-                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
-                        .putExtra(Intent.EXTRA_RETURN_RESULT, false)
-                startActivity(intent)
+                    Toast.makeText(
+                        this@MainActivity,
+                        "APK vérifiée — autorisez maintenant HomeDash à l’installer.",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    runCatching {
+                        startActivity(
+                            Intent(
+                                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                                Uri.parse("package:$packageName"),
+                            ),
+                        )
+                    }.onFailure {
+                        clearPendingUpdate()
+                        throw IllegalStateException("Réglage Android indisponible", it)
+                    }
+                }
             } catch (error: Exception) {
+                clearPendingUpdate()
+                val message =
+                    error.message
+                        ?: "Mise à jour impossible. Vérifiez la connexion Wi-Fi puis réessayez."
+                dispatchAndroidUpdateStatus("failed", message)
                 Toast.makeText(
                     this@MainActivity,
-                    error.message ?: "Mise à jour impossible",
+                    message,
                     Toast.LENGTH_LONG,
                 ).show()
+            } finally {
+                androidUpdateRunning = false
             }
         }
     }
 
+    private fun launchUpdateInstaller(apk: File) {
+        val uri =
+            FileProvider.getUriForFile(
+                this,
+                "$packageName.updates",
+                apk,
+            )
+        val intent =
+            Intent(Intent.ACTION_INSTALL_PACKAGE)
+                .setData(uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
+                .putExtra(Intent.EXTRA_RETURN_RESULT, false)
+        dispatchAndroidUpdateStatus(
+            "installer-opened",
+            "APK vérifiée. Confirmez maintenant la mise à jour dans l’écran Android.",
+        )
+        startActivity(intent)
+    }
+
+    private suspend fun downloadUpdateWithRetry(version: String): File {
+        var lastNetworkError: IOException? = null
+        repeat(UPDATE_DOWNLOAD_ATTEMPTS) { attempt ->
+            try {
+                return withContext(Dispatchers.IO) { downloadUpdate(version) }
+            } catch (error: IOException) {
+                lastNetworkError = error
+                if (attempt + 1 < UPDATE_DOWNLOAD_ATTEMPTS) {
+                    delay(UPDATE_RETRY_DELAYS_MS[attempt])
+                }
+            }
+        }
+        throw IllegalStateException(
+            "Connexion au Raspberry Pi impossible après $UPDATE_DOWNLOAD_ATTEMPTS tentatives. " +
+                "Vérifiez le Wi-Fi et l’adresse du serveur, puis réessayez.",
+            lastNetworkError,
+        )
+    }
+
     private fun downloadUpdate(version: String): File {
-        val serverUrl = preferences.getString(KEY_SERVER_URL, null) ?: error("Serveur non configuré")
+        val serverUrl = activeServerOrigin()
         val deviceId = preferences.getString(KEY_DEVICE_ID, null) ?: error("Tablette non associée")
         val token = preferences.getString(KEY_DEVICE_TOKEN, null) ?: error("Tablette non associée")
         val connection =
@@ -621,10 +676,10 @@ class MainActivity : ComponentActivity() {
                 throw IllegalStateException("APK trop volumineuse")
             }
 
-            val directory = File(cacheDir, "updates").apply { mkdirs() }
+            val directory = updateDirectory().apply { mkdirs() }
             directory.listFiles()?.forEach { if (it.isFile) it.delete() }
             val temporary = File(directory, ".homedash-kiosk-$version.apk.tmp")
-            val destination = File(directory, "homedash-kiosk-$version.apk")
+            val destination = updateDestination(version)
             val digest = MessageDigest.getInstance("SHA-256")
             var received = 0L
             connection.inputStream.use { input ->
@@ -652,6 +707,51 @@ class MainActivity : ComponentActivity() {
             return destination
         } finally {
             connection.disconnect()
+        }
+    }
+
+    private fun activeServerOrigin(): String {
+        val candidates =
+            listOfNotNull(
+                webView?.url,
+                preferences.getString(KEY_SERVER_URL, null),
+            )
+        for (candidate in candidates) {
+            runCatching {
+                val url = URL(candidate)
+                require(url.protocol == "https" || BuildConfig.DEBUG && url.protocol == "http")
+                return URI(url.protocol, null, url.host, url.port, null, null, null).toString()
+            }
+        }
+        error("Serveur non configuré")
+    }
+
+    private fun updateDirectory(): File = File(cacheDir, "updates")
+
+    private fun updateDestination(version: String): File =
+        File(updateDirectory(), "homedash-kiosk-$version.apk")
+
+    private fun setPendingUpdate(version: String) {
+        pendingUpdateVersion = version
+        preferences.edit().putString(KEY_PENDING_UPDATE_VERSION, version).apply()
+    }
+
+    private fun clearPendingUpdate() {
+        pendingUpdateVersion = null
+        preferences.edit().remove(KEY_PENDING_UPDATE_VERSION).apply()
+    }
+
+    private fun dispatchAndroidUpdateStatus(
+        state: String,
+        message: String? = null,
+    ) {
+        val detail = JSONObject().put("state", state)
+        if (message != null) detail.put("message", message)
+        webView?.post {
+            webView?.evaluateJavascript(
+                "window.dispatchEvent(new CustomEvent('homedash:android-update-status', { detail: $detail }))",
+                null,
+            )
         }
     }
 
@@ -721,10 +821,13 @@ class MainActivity : ComponentActivity() {
         private const val KEY_MOTION_WAKE_ENABLED = "motionWakeEnabled"
         private const val KEY_DEVICE_ID = "deviceId"
         private const val KEY_DEVICE_TOKEN = "deviceToken"
+        private const val KEY_PENDING_UPDATE_VERSION = "pendingUpdateVersion"
         private const val ORIENTATION_LANDSCAPE = "landscape"
         private const val ORIENTATION_PORTRAIT = "portrait"
         private const val ANDROID_BRIDGE_NAME = "HomeDashAndroid"
         private const val MAX_APK_BYTES = 100L * 1024L * 1024L
+        private const val UPDATE_DOWNLOAD_ATTEMPTS = 3
+        private val UPDATE_RETRY_DELAYS_MS = longArrayOf(1_000L, 3_000L)
         private val VERSION_PATTERN = Regex("^\\d+\\.\\d+\\.\\d+$")
         private val SHA256_PATTERN = Regex("^[a-f0-9]{64}$")
     }

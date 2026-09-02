@@ -4,6 +4,8 @@ Ce guide part d’une installation fonctionnelle en version `0.3.0` avec l’APK
 
 La version `0.4.0` constitue une transition : son installeur ajoute au Raspberry Pi Zero l’agent natif nécessaire au bouton de mise à jour du dashboard. Le passage serveur de `0.3.0` à `0.4.0` demande donc **une dernière commande SSH**. Ensuite, les releases applicatives ordinaires peuvent être installées depuis la tablette. L’APK `0.3.0` sait déjà mettre à jour l’application Android elle-même.
 
+La version `0.4.2` corrige le premier passage par l’autorisation Android « Installer des applications inconnues ». L’APK est désormais téléchargée et vérifiée avant d’ouvrir ce réglage, puis reprise depuis le cache privé au retour dans HomeDash. Trois tentatives sont effectuées en cas de coupure réseau transitoire et l’interface affiche chaque étape.
+
 ## Vue d’ensemble
 
 Une mise à jour comporte deux éléments distincts :
@@ -45,7 +47,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.1` et `versionCode = 8`.
+Pour la présente release, les valeurs attendues sont `0.4.2` et `versionCode = 9`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -80,7 +82,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.1: icônes météo et réveil par mouvement"
+git commit -m "Release 0.4.2: fiabilisation de la mise à jour Android"
 git push origin main
 ```
 
@@ -105,8 +107,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.1 -m "HomeDash 0.4.1"
-git push origin v0.4.1
+git tag -a v0.4.2 -m "HomeDash 0.4.2"
+git push origin v0.4.2
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -122,13 +124,13 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.1**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.2**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.1.tar.gz
-homedash-native-0.4.1.tar.gz.sha256
-homedash-kiosk-0.4.1.apk
-homedash-kiosk-0.4.1.apk.sha256
+homedash-native-0.4.2.tar.gz
+homedash-native-0.4.2.tar.gz.sha256
+homedash-kiosk-0.4.2.apk
+homedash-kiosk-0.4.2.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
@@ -187,9 +189,11 @@ Après la réussite de la mise à jour serveur :
 
 1. dans **Paramètres > Mises à jour**, touchez de nouveau **Vérifier** ;
 2. touchez **Installer l’application X.Y.Z** ;
-3. la première fois seulement, Android ouvre **Installer des applications inconnues** : autorisez HomeDash, puis revenez ;
-4. confirmez **Mettre à jour** dans l’écran système Android ;
-5. rouvrez HomeDash et vérifiez **Application tablette X.Y.Z**.
+3. attendez la fin du téléchargement et de la vérification de l’APK ;
+4. la première fois seulement, Android ouvre **Installer des applications inconnues** : autorisez HomeDash, puis revenez ;
+5. HomeDash reprend l’APK déjà vérifiée, sans nouveau téléchargement ;
+6. confirmez **Mettre à jour** dans l’écran système Android ;
+7. rouvrez HomeDash et vérifiez **Application tablette X.Y.Z**.
 
 Android exige toujours cette confirmation visible pour une APK hors Play Store. HomeDash ne la contourne pas. L’adresse du Pi, l’orientation et l’association restent enregistrées.
 
@@ -253,6 +257,12 @@ sudo homedash-update-native vX.Y.Z
 ### Android refuse l’APK
 
 La nouvelle APK doit conserver le même `applicationId`, être signée par le même keystore et avoir un `versionCode` supérieur. Si l’un de ces trois éléments diffère, Android refuse la mise à jour pour protéger les données de l’application.
+
+### Une APK 0.4.0 ou 0.4.1 affiche `Failed to connect …:443`
+
+Ces versions demandaient l’autorisation Android avant de télécharger l’APK. Sur certaines tablettes, la connexion locale n’est pas immédiatement rétablie au retour de ce réglage.
+
+Après avoir autorisé HomeDash comme source, fermez complètement puis rouvrez l’application, déverrouillez les paramètres et touchez de nouveau **Installer l’application 0.4.2**. L’autorisation étant déjà acquise, l’ancienne application tente cette fois le téléchargement sans quitter HomeDash. Si la connexion échoue encore, téléchargez `homedash-kiosk-0.4.2.apk` depuis la Release GitHub sur la tablette et ouvrez le fichier : cette installation manuelle unique conserve l’adresse du Pi, l’association et les réglages de HomeDash. Les mises à jour suivantes utiliseront le flux corrigé.
 
 ## Rollback manuel de dernier recours
 
