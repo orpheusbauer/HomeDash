@@ -1,21 +1,11 @@
-import { useEffect, useRef } from 'react';
-import { GridStack, type GridStackNode } from 'gridstack';
+import { useLayoutEffect, useRef } from 'react';
+import { GridStack, type GridItemHTMLElement } from 'gridstack';
 import { Grip, Settings2, Trash2 } from 'lucide-react';
 import type { LayoutItem, WidgetInstance, WidgetManifest } from '@homedash/contracts';
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 
-const BASE_GRID_COLUMNS = 48;
-
-export function normalizeResponsiveLayout(
-  item: { x: number; w: number },
-  currentColumns: number,
-): { x: number; w: number } {
-  const scale = BASE_GRID_COLUMNS / Math.max(1, currentColumns);
-  const x = Math.max(0, Math.round(item.x * scale));
-  const width = Math.max(1, Math.round(item.w * scale));
-  return { x: Math.min(x, BASE_GRID_COLUMNS - 1), w: Math.min(width, BASE_GRID_COLUMNS - x) };
-}
+export const GRID_COLUMNS = 48;
 
 interface DashboardGridProps {
   instances: WidgetInstance[];
@@ -38,29 +28,25 @@ export function DashboardGrid({
 }: DashboardGridProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<GridStack | null>(null);
-  const readyRef = useRef(false);
+  const syncingRef = useRef(false);
+  const editingRef = useRef(editing);
+  editingRef.current = editing;
   const layoutHandler = useRef(onLayoutChange);
   layoutHandler.current = onLayoutChange;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!containerRef.current) return;
-    readyRef.current = false;
     const grid = GridStack.init(
       {
-        column: BASE_GRID_COLUMNS,
-        columnOpts: {
-          breakpointForWindow: true,
-          breakpoints: [
-            { w: 900, c: 24, layout: 'moveScale' },
-            { w: 560, c: 1, layout: 'list' },
-          ],
-          layout: 'moveScale',
-        },
+        // Keep the same coordinate system in portrait, landscape and edit mode.
+        // Changing columns caches alternate layouts and can restore stale sizes.
+        column: GRID_COLUMNS,
+        auto: false,
         cellHeight: 22,
         margin: 8,
         float: true,
         animate: true,
-        staticGrid: !editing,
+        staticGrid: !editingRef.current,
         draggable: { handle: '.widget-drag-handle', scroll: true },
         resizable: { handles: 'e,se,s,sw,w' },
         alwaysShowResizeHandle: 'mobile',
@@ -69,22 +55,19 @@ export function DashboardGrid({
     );
     if (!grid) return;
     gridRef.current = grid;
-    const onChange = (_event: Event, nodes: GridStackNode[]) => {
-      if (!readyRef.current || !editing) return;
-      const currentColumns = grid.getColumn();
-      const items = nodes
+    const onChange = () => {
+      if (syncingRef.current || !editingRef.current) return;
+      // A full snapshot includes widgets displaced by collisions, not just the
+      // last node touched. React never writes GridStack's positioning attributes.
+      const items = grid.engine.nodes
         .map((node) => {
-          const id = node.el?.getAttribute('gs-id');
+          const id = node.id;
           if (!id) return null;
-          const normalized = normalizeResponsiveLayout(
-            { x: node.x ?? 0, w: node.w ?? 1 },
-            currentColumns,
-          );
           return {
             id,
-            x: normalized.x,
+            x: node.x ?? 0,
             y: node.y ?? 0,
-            w: normalized.w,
+            w: node.w ?? 1,
             h: node.h ?? 1,
           } satisfies LayoutItem;
         })
@@ -92,50 +75,123 @@ export function DashboardGrid({
       if (items.length > 0) layoutHandler.current(items);
     };
     grid.on('change', onChange);
-    const readyTimer = window.setTimeout(() => {
-      readyRef.current = true;
-    }, 100);
+    // GridStack translates touchend to mouseup but does not handle touchcancel.
+    // Finish the same gesture if Android interrupts it (scroll, sleep, app switch).
+    let touchTarget: EventTarget | null = null;
+    let lastTouches: Touch[] = [];
+    const rememberTouch = (event: TouchEvent) => {
+      if (event.type === 'touchstart') touchTarget = event.target;
+      lastTouches = Array.from(event.changedTouches);
+    };
+    const clearTouch = () => {
+      touchTarget = null;
+      lastTouches = [];
+    };
+    const finishGesture = () => {
+      if (touchTarget && lastTouches.length) {
+        touchTarget.dispatchEvent(
+          new TouchEvent('touchend', {
+            bubbles: true,
+            cancelable: true,
+            changedTouches: lastTouches,
+          }),
+        );
+      }
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      clearTouch();
+    };
+    const onVisibility = () => {
+      if (document.hidden) finishGesture();
+    };
+    const container = containerRef.current;
+    container.addEventListener('touchstart', rememberTouch, { passive: true, capture: true });
+    container.addEventListener('touchmove', rememberTouch, { passive: true, capture: true });
+    container.addEventListener('touchend', clearTouch);
+    container.addEventListener('touchcancel', finishGesture);
+    window.addEventListener('blur', finishGesture);
+    document.addEventListener('visibilitychange', onVisibility);
     return () => {
-      window.clearTimeout(readyTimer);
-      readyRef.current = false;
+      syncingRef.current = true;
+      finishGesture();
+      container.removeEventListener('touchstart', rememberTouch, true);
+      container.removeEventListener('touchmove', rememberTouch, true);
+      container.removeEventListener('touchend', clearTouch);
+      container.removeEventListener('touchcancel', finishGesture);
+      window.removeEventListener('blur', finishGesture);
+      document.removeEventListener('visibilitychange', onVisibility);
       grid.off('change');
       grid.destroy(false);
       gridRef.current = null;
+      syncingRef.current = false;
     };
-  }, [editing, instances]);
+  }, []);
+
+  useLayoutEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || !containerRef.current) return;
+    const ids = new Set(instances.map((instance) => instance.id));
+    const membershipUnchanged =
+      grid.engine.nodes.length === ids.size &&
+      grid.engine.nodes.every((node) => node.id && ids.has(node.id));
+    if (editing && membershipUnchanged) return;
+    syncingRef.current = true;
+    grid.batchUpdate();
+    for (const node of [...grid.engine.nodes]) {
+      if (node.id && !ids.has(node.id) && node.el) grid.removeWidget(node.el, false, false);
+    }
+    for (const element of containerRef.current.querySelectorAll<GridItemHTMLElement>(
+      '.grid-stack-item',
+    )) {
+      if (element.gridstackNode) continue;
+      const instance = instances.find((item) => item.id === element.getAttribute('gs-id'));
+      if (!instance) continue;
+      const manifest = manifests.find((item) => item.id === instance.widgetId);
+      grid.makeWidget(element, {
+        id: instance.id,
+        x: instance.x,
+        y: instance.y,
+        w: instance.w,
+        h: instance.h,
+        minW: manifest?.size.min.w ?? 1,
+        minH: manifest?.size.min.h ?? 1,
+        ...(manifest?.size.max ? { maxW: manifest.size.max.w, maxH: manifest.size.max.h } : {}),
+      });
+    }
+    // Background refreshes may contain the last saved layout: do not replace an
+    // in-progress edit with it. Explicit undo remounts this component separately.
+    if (!editing)
+      grid.load(
+        instances.map(({ id, x, y, w, h }) => ({ id, x, y, w, h })),
+        false,
+      );
+    grid.batchUpdate(false);
+    syncingRef.current = false;
+  }, [editing, instances, manifests]);
+
+  useLayoutEffect(() => {
+    gridRef.current?.el.classList.toggle('dashboard-grid--editing', editing);
+    gridRef.current?.setStatic(!editing);
+  }, [editing]);
 
   if (instances.length === 0) {
     return (
-      <div className="empty-page">
-        <span>Cette page est vide.</span>
-        <strong>Passez en mode édition pour ajouter votre premier widget.</strong>
+      <div className="grid-stack dashboard-grid" ref={containerRef}>
+        <div className="empty-page">
+          <span>Cette page est vide.</span>
+          <strong>Passez en mode édition pour ajouter votre premier widget.</strong>
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      className={`grid-stack dashboard-grid ${editing ? 'dashboard-grid--editing' : ''}`}
-      ref={containerRef}
-    >
+    <div className="grid-stack dashboard-grid" ref={containerRef}>
       {instances.map((instance) => {
         const manifest = manifests.find((candidate) => candidate.id === instance.widgetId);
         return (
-          <div
-            className="grid-stack-item"
-            key={instance.id}
-            gs-id={instance.id}
-            gs-x={instance.x}
-            gs-y={instance.y}
-            gs-w={instance.w}
-            gs-h={instance.h}
-            gs-min-w={manifest?.size.min.w ?? 1}
-            gs-min-h={manifest?.size.min.h ?? 1}
-            gs-max-w={manifest?.size.max?.w}
-            gs-max-h={manifest?.size.max?.h}
-          >
+          <div className="grid-stack-item" key={instance.id} gs-id={instance.id}>
             <article className="grid-stack-item-content widget-card">
-              <header className={`widget-card__header ${editing ? 'widget-drag-handle' : ''}`}>
+              <header className="widget-card__header widget-drag-handle">
                 <div className="widget-card__title">
                   {editing && <Grip size={18} />}
                   <span>{instance.title || manifest?.name || instance.widgetId}</span>

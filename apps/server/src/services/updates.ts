@@ -137,9 +137,22 @@ export async function checkForUpdates(): Promise<{
   url: string | null;
   manifest: ReleaseManifest | null;
   android: { version: string | null; downloadAvailable: boolean };
+  automatic: { enabled: boolean; intervalMinutes: number };
 }> {
+  const automatic = {
+    enabled:
+      config.NODE_ENV === 'production' &&
+      config.HOMEDASH_AUTO_UPDATE &&
+      existsSync(config.HOMEDASH_UPDATER_SOCKET),
+    intervalMinutes: config.HOMEDASH_AUTO_UPDATE_INTERVAL_MS / 60_000,
+  };
   const release = await fetchRelease('latest');
-  if (!release) {
+  if (
+    !release ||
+    release.draft ||
+    release.prerelease ||
+    !/^v\d+\.\d+\.\d+$/.test(release.tag_name)
+  ) {
     return {
       installedVersion: config.version,
       availableVersion: null,
@@ -151,6 +164,7 @@ export async function checkForUpdates(): Promise<{
       url: null,
       manifest: null,
       android: { version: null, downloadAvailable: false },
+      automatic,
     };
   }
   const availableVersion = release.tag_name.replace(/^v/, '');
@@ -187,6 +201,7 @@ export async function checkForUpdates(): Promise<{
     url: release.html_url,
     manifest,
     android: { version: availableVersion, downloadAvailable: androidDownloadAvailable },
+    automatic,
   };
 }
 

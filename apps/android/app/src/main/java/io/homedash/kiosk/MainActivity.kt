@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
     private var pendingUpdateVersion: String? = null
     private var androidUpdateRunning = false
     private var exitingToAndroid = false
+    private var activityResumed = false
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
@@ -103,10 +105,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        activityResumed = true
         exitingToAndroid = false
         leaveLegacyKioskMode()
         hideSystemBars()
-        if (webView != null && shouldRunPresenceService()) {
+        if (shouldRunPresenceService()) {
             startPresenceService()
         }
         if (deviceAdminRequestPending) {
@@ -136,6 +139,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onPause() {
+        activityResumed = false
+        super.onPause()
     }
 
     override fun onStop() {
@@ -455,7 +463,16 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startPresenceService() {
-        ContextCompat.startForegroundService(this, Intent(this, PresenceService::class.java))
+        // Android's while-in-use camera permission requires a visible activity
+        // when the foreground service is first started. onResume retries for us.
+        if (!activityResumed || !shouldRunPresenceService()) return
+        try {
+            ContextCompat.startForegroundService(this, Intent(this, PresenceService::class.java))
+        } catch (error: RuntimeException) {
+            CameraDiagnostics.error = "Android refuse le démarrage caméra : rouvrez HomeDash et vérifiez les autorisations"
+            android.util.Log.w("HomeDashCamera", CameraDiagnostics.error, error)
+            dispatchMotionWakeStatusChanged()
+        }
     }
 
     private fun isDeviceAdminActive(): Boolean =
@@ -506,6 +523,15 @@ class MainActivity : ComponentActivity() {
                     ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
                     PackageManager.PERMISSION_GRANTED,
             ).put("batteryOptimizationsIgnored", power.isIgnoringBatteryOptimizations(packageName))
+            .put("serviceRunning", CameraDiagnostics.serviceRunning)
+            .put("receivingFrames", CameraDiagnostics.receivingFrames(SystemClock.elapsedRealtime()))
+            .put("cameraError", CameraDiagnostics.error ?: JSONObject.NULL)
+            .put("lastFrameAgeSeconds", if (CameraDiagnostics.lastFrameAt > 0L) {
+                (SystemClock.elapsedRealtime() - CameraDiagnostics.lastFrameAt) / 1_000
+            } else JSONObject.NULL)
+            .put("lastMotionAgeSeconds", if (CameraDiagnostics.lastMotionAt > 0L) {
+                (SystemClock.elapsedRealtime() - CameraDiagnostics.lastMotionAt) / 1_000
+            } else JSONObject.NULL)
             .toString()
     }
 

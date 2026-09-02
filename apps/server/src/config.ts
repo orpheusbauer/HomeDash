@@ -24,6 +24,11 @@ const envSchema = z.object({
   HOMEDASH_UPDATER_SOCKET: z.string().default('/run/homedash-updater/updater.sock'),
   HOMEDASH_UPDATER_TOKEN: z.string().optional(),
   HOMEDASH_UPDATER_TOKEN_FILE: z.string().optional(),
+  HOMEDASH_AUTO_UPDATE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  HOMEDASH_AUTO_UPDATE_INTERVAL_MS: z.coerce.number().int().min(60_000).default(600_000),
   GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().optional(),
@@ -43,7 +48,7 @@ function readVersion(): string {
       // The image can inject HOMEDASH_VERSION when VERSION is not beside the process.
     }
   }
-  return process.env.HOMEDASH_VERSION ?? '0.4.2';
+  return process.env.HOMEDASH_VERSION ?? '0.4.3';
 }
 
 export const config = {

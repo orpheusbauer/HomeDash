@@ -3,8 +3,10 @@ import { config } from './config.js';
 import { closeDatabase } from './db/index.js';
 import { broadcast } from './realtime.js';
 import { readSystemMetrics } from './services/system.js';
+import { startAutomaticUpdates } from './services/auto-updates.js';
 
 const app = await createApp();
+const stopAutomaticUpdates = startAutomaticUpdates(app.log);
 
 const mockTimer = config.HOMEDASH_ENABLE_MOCK_SENSORS
   ? setInterval(() => {
@@ -27,6 +29,7 @@ systemTimer.unref();
 const shutdown = async (signal: string): Promise<void> => {
   app.log.info({ signal }, 'HomeDash stopping');
   if (mockTimer) clearInterval(mockTimer);
+  stopAutomaticUpdates();
   clearInterval(systemTimer);
   await app.close();
   closeDatabase();

@@ -48,7 +48,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: 8.10.2
-      - run: gradle -p apps/android assembleDebug --stacktrace
+      - run: gradle -p apps/android testDebugUnitTest assembleDebug --stacktrace
       - uses: actions/upload-artifact@v6
         with:
           name: homedash-kiosk-debug

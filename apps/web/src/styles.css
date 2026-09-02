@@ -299,6 +299,14 @@ button {
   min-height: 300px;
 }
 
+.dashboard-grid .grid-stack-placeholder {
+  pointer-events: none;
+}
+
+.dashboard-grid .ui-resizable-handle {
+  touch-action: none;
+}
+
 .orientation-selector {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -373,12 +381,12 @@ button {
   user-select: none;
 }
 
-.widget-drag-handle {
+.dashboard-grid--editing .widget-drag-handle {
   cursor: grab;
   touch-action: none;
 }
 
-.widget-drag-handle:active {
+.dashboard-grid--editing .widget-drag-handle:active {
   cursor: grabbing;
 }
 

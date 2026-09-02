@@ -5,6 +5,11 @@ export type MotionWakeStatus = {
   cameraGranted: boolean;
   notificationGranted: boolean;
   batteryOptimizationsIgnored: boolean;
+  serviceRunning?: boolean;
+  receivingFrames?: boolean;
+  cameraError?: string | null;
+  lastFrameAgeSeconds?: number | null;
+  lastMotionAgeSeconds?: number | null;
 };
 
 interface HomeDashAndroidBridge {

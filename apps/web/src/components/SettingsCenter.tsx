@@ -41,6 +41,7 @@ type UpdateInfo = {
   installable: boolean;
   manifest: Record<string, unknown> | null;
   android: { version: string | null; downloadAvailable: boolean };
+  automatic?: { enabled: boolean; intervalMinutes: number };
 };
 type CalendarStatus = { configured: boolean; connected: boolean; message: string };
 type UpdateStatus = {
@@ -124,7 +125,10 @@ export function SettingsCenter({
   const install = useMutation({
     mutationFn: (manifest: Record<string, unknown>) =>
       api('/api/v1/updates/install', { method: 'POST', body: JSON.stringify({ manifest }) }, true),
-    onSuccess: () => setServerUpdateStarted(true),
+    onSuccess: () => {
+      client.setQueryData<UpdateStatus>(['admin', 'updates', 'status'], { state: 'installing' });
+      setServerUpdateStarted(true);
+    },
   });
   const updateStatus = useQuery({
     queryKey: ['admin', 'updates', 'status'],
@@ -142,10 +146,12 @@ export function SettingsCenter({
     if (!motionWakeSupported) return;
     const refresh = () => setMotionWake(getMotionWakeStatus());
     refresh();
+    const diagnosticTimer = window.setInterval(refresh, 2_000);
     window.addEventListener('focus', refresh);
     window.addEventListener('homedash:motion-wake-status', refresh);
     document.addEventListener('visibilitychange', refresh);
     return () => {
+      window.clearInterval(diagnosticTimer);
       window.removeEventListener('focus', refresh);
       window.removeEventListener('homedash:motion-wake-status', refresh);
       document.removeEventListener('visibilitychange', refresh);
@@ -289,6 +295,33 @@ export function SettingsCenter({
                     Notification {motionWake.notificationGranted ? 'autorisée' : 'masquée'}
                   </span>
                 </div>
+                {motionWake.enabled && typeof motionWake.receivingFrames === 'boolean' && (
+                  <div role="status">
+                    <p className={motionWake.receivingFrames ? 'form-hint' : 'text-danger'}>
+                      {motionWake.receivingFrames
+                        ? 'Caméra opérationnelle : les images arrivent et sont analysées localement.'
+                        : motionWake.serviceRunning
+                          ? 'Service démarré, mais aucune image récente reçue. Reprise automatique en cours.'
+                          : 'Le service caméra est arrêté. Rouvrez HomeDash ou touchez Réessayer.'}
+                    </p>
+                    {motionWake.cameraError && (
+                      <p className="text-danger">{motionWake.cameraError}</p>
+                    )}
+                    {motionWake.lastMotionAgeSeconds != null && (
+                      <p className="form-hint">
+                        Dernier mouvement détecté il y a {motionWake.lastMotionAgeSeconds} s.
+                      </p>
+                    )}
+                    {!motionWake.receivingFrames && (
+                      <button
+                        className="button button--ghost"
+                        onClick={requestMotionWakePermission}
+                      >
+                        Réessayer la caméra
+                      </button>
+                    )}
+                  </div>
+                )}
                 {!motionWake.cameraGranted && (
                   <div className="button-row">
                     {motionWake.enabled && (
@@ -387,6 +420,16 @@ export function SettingsCenter({
               <span>Dernière version</span>
               <strong>{updates.data.availableVersion ?? 'Aucune release'}</strong>
             </div>
+            {updates.data.automatic && (
+              <div>
+                <span>Installation automatique du Pi</span>
+                <strong>
+                  {updates.data.automatic.enabled
+                    ? `Toutes les ${updates.data.automatic.intervalMinutes} minutes`
+                    : 'Désactivée ou agent absent'}
+                </strong>
+              </div>
+            )}
             <div>
               <span>État</span>
               <strong>{updates.data.updateAvailable ? 'Mise à jour disponible' : 'À jour'}</strong>
@@ -412,13 +455,24 @@ export function SettingsCenter({
           {updates.data?.updateAvailable && updates.data.installable && updates.data.manifest && (
             <button
               className="button button--primary"
-              disabled={install.isPending || serverUpdateStarted}
+              disabled={
+                install.isPending ||
+                (serverUpdateStarted &&
+                  !['failed', 'interrupted'].includes(updateStatus.data?.state ?? 'installing'))
+              }
               onClick={() => install.mutate(updates.data.manifest!)}
             >
               Installer {updates.data.availableVersion}
             </button>
           )}
         </div>
+        {updates.data?.automatic?.enabled && (
+          <p className="form-hint">
+            Le Pi installe les nouvelles releases même si la tablette est éteinte. Le délai de
+            vérification n’inclut pas le téléchargement et l’installation. L’APK Android reste à
+            confirmer ici après la mise à jour du serveur.
+          </p>
+        )}
         {updates.data?.updateAvailable && !updates.data.installable && (
           <p className="form-hint">
             Le Raspberry Pi Zero se met à jour par la commande SSH sécurisée décrite dans le guide

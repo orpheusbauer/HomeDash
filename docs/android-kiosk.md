@@ -321,13 +321,12 @@ Sur la tablette :
 
 Android tourne immédiatement l’activité. HomeDash applique automatiquement :
 
-- 48 colonnes en grand paysage pour un redimensionnement fin ;
-- 24 colonnes en portrait de tablette ;
-- une seule colonne sur un écran très étroit ;
+- une grille de référence unique de 48 colonnes en paysage comme en portrait ;
+- des largeurs proportionnelles à l’écran, sans empilement automatique ni conversion des tailles enregistrées ;
 - une barre supérieure sur une seule rangée, avec l’onglet Accueil immédiatement à droite du logo ;
 - des cartes, marges, titres et onglets adaptés à la largeur disponible.
 
-La transformation responsive n’écrase pas la disposition 48 colonnes enregistrée tant que le mode édition n’est pas activé.
+Depuis 0.4.3, **Terminer** attend l’enregistrement de toute la disposition avant de fermer l’édition. Les actualisations du serveur ne remplacent pas un geste en cours et une interruption tactile libère la grille. En cas de panne réseau, l’édition reste ouverte avec ses modifications : réessayez **Terminer**. **Annuler** abandonne les modifications non enregistrées ; en l’absence de brouillon, il restaure la disposition précédemment sauvegardée. Changer de page en cours d’édition enregistre d’abord la page actuelle.
 
 ## 8. Configurer la veille, le réveil par mouvement et le verrouillage
 
@@ -348,6 +347,12 @@ Cette fonction compare environ deux fois par seconde de minuscules trames en niv
 7. effectuez plusieurs essais à la distance et avec l’éclairage réels avant de fixer la tablette au mur.
 
 Pendant le fonctionnement, Android affiche son voyant de confidentialité caméra et une notification permanente **HomeDash actif**. Le service conserve le processeur et la caméra actifs alors que seule la dalle est éteinte. Cela consomme davantage d’énergie et peut chauffer : cette fonction est destinée à une tablette murale branchée, à valider pendant au moins 48 heures.
+
+Depuis l’APK 0.4.3, les paramètres distinguent **permission accordée**, **service démarré** et **images effectivement reçues**. Ils montrent le dernier mouvement et un bouton **Réessayer la caméra** en cas de blocage. La caméra et les requêtes réseau utilisent des files séparées, les connexions au Pi expirent après cinq secondes et ML Kit travaille sur une copie privée immédiatement libérée côté CameraX. Une perte d’images déclenche une tentative de réouverture après environ 30 secondes ; les erreurs d’ouverture sont réessayées avec un délai croissant borné à une minute. Une caméra en panne ne déclenche pas l’extinction pour absence.
+
+Les permissions nécessaires sont déjà déclarées : caméra, service de premier plan de type caméra, notifications, verrou CPU et exemption d’optimisation batterie. Il n’existe pas de permission publique « caméra toujours autorisée » qui supprime les restrictions Android. Le service est démarré lorsque HomeDash est visible et reste indépendant de l’activité WebView pendant la veille. Voir les règles officielles [services caméra Android](https://developer.android.com/develop/background-work/services/fgs/service-types#camera) et [permissions pendant l’utilisation](https://developer.android.com/training/permissions/requesting).
+
+Pour diagnostiquer sur la tablette : activez le bouton système **Accès caméra** (Android 12+), fermez les autres applications utilisant la caméra, ouvrez HomeDash puis vérifiez **Caméra opérationnelle** et le dernier mouvement. Coupez temporairement le Wi-Fi : le mouvement doit toujours être détecté. Ensuite, laissez l’écran s’éteindre et testez le réveil après au moins deux secondes. Sans la tablette physique, les tests logiciels ne peuvent garantir que sa ROM conserve la caméra active écran éteint.
 
 Le bouton **Android** arrête volontairement la caméra et le service. Le réglage reste mémorisé, mais il faut rouvrir HomeDash pour réarmer la détection. Android impose aussi que le service caméra soit démarré pendant que l’application est visible ; après un redémarrage ou si le constructeur tue l’application, ouvrez HomeDash une fois si la détection n’a pas repris. Certaines ROMs ferment malgré tout la caméra écran éteint : dans ce cas, vérifiez d’abord les réglages batterie/démarrage automatique, puis considérez la fonction comme incompatible avec cette ROM si le problème persiste.
 

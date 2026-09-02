@@ -22,7 +22,7 @@ import type {
   WidgetInstance,
 } from '@homedash/contracts';
 import { exitToAndroid, hasAndroidBridge } from './android-bridge';
-import { api, hasAdminSession, realtimeUrl } from './api';
+import { api, ApiError, hasAdminSession, realtimeUrl } from './api';
 import { AdminDialog } from './components/AdminDialog';
 import { DashboardGrid } from './components/DashboardGrid';
 import { Modal } from './components/Modal';
@@ -44,8 +44,8 @@ export function App() {
   const queryClient = useQueryClient();
   const bootstrap = useQuery({
     queryKey: ['bootstrap'],
-    queryFn: async () => {
-      const data = await api<BootstrapData>('/api/v1/bootstrap');
+    queryFn: async ({ signal }) => {
+      const data = await api<BootstrapData>('/api/v1/bootstrap', { signal });
       localStorage.setItem('homedash.bootstrap', JSON.stringify(data));
       return data;
     },
@@ -68,7 +68,15 @@ export function App() {
   const [toast, setToast] = useState('');
   const isAndroidApp = hasAndroidBridge();
   const revisionRef = useRef<Record<string, number>>({});
-  const saveTimerRef = useRef<number | undefined>(undefined);
+  const editingRevisionRef = useRef(0);
+  const layoutDraftRef = useRef<{
+    pageId: string;
+    expectedRevision: number;
+    items: LayoutItem[];
+  } | null>(null);
+  const layoutSaveRef = useRef<Promise<boolean> | null>(null);
+  const [savingLayout, setSavingLayout] = useState(false);
+  const [layoutEpoch, setLayoutEpoch] = useState(0);
 
   useEffect(() => {
     if (!data) return;
@@ -129,11 +137,24 @@ export function App() {
   useEffect(() => {
     const lockAdmin = () => {
       setAdminUnlocked(false);
-      setEditing(false);
+      if (layoutDraftRef.current) {
+        setAdminPurpose('editing');
+        setShowAdmin(true);
+      } else setEditing(false);
       setToast('Session administrateur expirée');
     };
     window.addEventListener('homedash:admin-locked', lockAdmin);
     return () => window.removeEventListener('homedash:admin-locked', lockAdmin);
+  }, []);
+
+  useEffect(() => {
+    const protectDraft = (event: BeforeUnloadEvent) => {
+      if (!layoutDraftRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectDraft);
+    return () => window.removeEventListener('beforeunload', protectDraft);
   }, []);
 
   const activePage = data?.pages.find((page) => page.id === activePageId) ?? data?.pages[0];
@@ -145,6 +166,7 @@ export function App() {
   function requestEditing() {
     if (adminUnlocked || hasAdminSession()) {
       setAdminUnlocked(true);
+      editingRevisionRef.current = revisionRef.current[activePage?.id ?? ''] ?? 0;
       setEditing(true);
     } else {
       setAdminPurpose('editing');
@@ -162,33 +184,90 @@ export function App() {
     }
   }
 
-  async function saveLayout(items: LayoutItem[]) {
+  function saveLayout(items: LayoutItem[]) {
     if (!activePage) return;
-    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = window.setTimeout(async () => {
+    layoutDraftRef.current = {
+      pageId: activePage.id,
+      expectedRevision: layoutDraftRef.current?.expectedRevision ?? editingRevisionRef.current,
+      items,
+    };
+  }
+
+  function persistLayout(): Promise<boolean> {
+    if (layoutSaveRef.current) return layoutSaveRef.current;
+    const draft = layoutDraftRef.current;
+    if (!draft) return Promise.resolve(true);
+    setSavingLayout(true);
+    const pending = (async () => {
       try {
         const result = await api<{ revision: number }>(
-          `/api/v1/pages/${activePage.id}/layout`,
+          `/api/v1/pages/${draft.pageId}/layout`,
           {
             method: 'PUT',
             body: JSON.stringify({
-              expectedRevision: revisionRef.current[activePage.id] ?? 0,
-              items,
+              expectedRevision: draft.expectedRevision,
+              items: draft.items,
             }),
           },
           true,
         );
-        revisionRef.current[activePage.id] = result.revision;
+        revisionRef.current[draft.pageId] = result.revision;
+        editingRevisionRef.current = result.revision;
+        // Cancel older bootstrap requests before acknowledging this snapshot.
+        await queryClient.cancelQueries({ queryKey: ['bootstrap'] });
+        queryClient.setQueryData<BootstrapData>(['bootstrap'], (previous) => {
+          if (!previous) return previous;
+          const saved = {
+            ...previous,
+            layoutRevision: { ...previous.layoutRevision, [draft.pageId]: result.revision },
+            instances: previous.instances.map((instance) => ({
+              ...instance,
+              ...draft.items.find((item) => item.id === instance.id),
+            })),
+          };
+          try {
+            localStorage.setItem('homedash.bootstrap', JSON.stringify(saved));
+          } catch {
+            /* Cache optional. */
+          }
+          return saved;
+        });
+        if (layoutDraftRef.current === draft) layoutDraftRef.current = null;
+        else if (layoutDraftRef.current) layoutDraftRef.current.expectedRevision = result.revision;
         setToast('Disposition sauvegardée');
-      } catch {
-        setToast('Impossible de sauvegarder la disposition');
-        await bootstrap.refetch();
+        return true;
+      } catch (error) {
+        setToast(
+          error instanceof ApiError && error.code === 'LAYOUT_CONFLICT'
+            ? 'Disposition modifiée ailleurs. Vos changements restent visibles ; Annuler recharge la version du serveur.'
+            : 'Sauvegarde impossible. Vos modifications sont conservées : réessayez Terminer.',
+        );
+        return false;
+      } finally {
+        layoutSaveRef.current = null;
+        setSavingLayout(false);
       }
-    }, 350);
+    })();
+    layoutSaveRef.current = pending;
+    return pending;
+  }
+
+  async function finishEditing(): Promise<boolean> {
+    if (!(await persistLayout())) return false;
+    // If a last gesture ended while the request was in flight, save that too.
+    if (layoutDraftRef.current) return finishEditing();
+    setEditing(false);
+    return true;
+  }
+
+  async function changePage(pageId: string) {
+    if (editing && !(await finishEditing())) return;
+    setActivePageId(pageId);
   }
 
   async function addWidget(widgetId: string) {
     if (!activePage) return;
+    if (!(await persistLayout())) return;
     await api(
       `/api/v1/pages/${activePage.id}/widgets`,
       { method: 'POST', body: JSON.stringify({ widgetId, config: {} }) },
@@ -206,12 +285,14 @@ export function App() {
       )
     )
       return;
+    if (!(await persistLayout())) return;
     await api(`/api/v1/widgets/${instance.id}`, { method: 'DELETE' }, true);
     await bootstrap.refetch();
   }
 
   async function saveWidget(title: string | null, config: Record<string, unknown>) {
     if (!configuredWidget) return;
+    if (!(await persistLayout())) return;
     await api(
       `/api/v1/widgets/${configuredWidget.id}`,
       { method: 'PATCH', body: JSON.stringify({ title, config }) },
@@ -223,6 +304,7 @@ export function App() {
   }
 
   async function createPage(name: string) {
+    if (editing && !(await finishEditing())) return;
     const page = await api<DashboardPage>(
       '/api/v1/pages',
       { method: 'POST', body: JSON.stringify({ name }) },
@@ -244,12 +326,22 @@ export function App() {
   async function deletePage(page: DashboardPage) {
     if (!window.confirm(`Supprimer définitivement la page « ${page.name} » et tous ses widgets ?`))
       return;
+    if (editing && !(await finishEditing())) return;
     await api(`/api/v1/pages/${page.id}`, { method: 'DELETE' }, true);
     await bootstrap.refetch();
   }
 
   async function undoLayout() {
     if (!activePage) return;
+    if (savingLayout) return;
+    if (layoutDraftRef.current) {
+      layoutDraftRef.current = null;
+      const refreshed = await bootstrap.refetch();
+      editingRevisionRef.current = refreshed.data?.layoutRevision[activePage.id] ?? 0;
+      setLayoutEpoch((value) => value + 1);
+      setToast('Modifications non enregistrées annulées');
+      return;
+    }
     try {
       const result = await api<{ revision: number }>(
         `/api/v1/pages/${activePage.id}/layout/undo`,
@@ -257,7 +349,9 @@ export function App() {
         true,
       );
       revisionRef.current[activePage.id] = result.revision;
+      editingRevisionRef.current = result.revision;
       await bootstrap.refetch();
+      setLayoutEpoch((value) => value + 1);
       setToast('Disposition précédente restaurée');
     } catch {
       setToast('Aucune disposition précédente');
@@ -294,7 +388,8 @@ export function App() {
             <button
               className={page.id === activePage?.id ? 'is-active' : ''}
               key={page.id}
-              onClick={() => setActivePageId(page.id)}
+              onClick={() => void changePage(page.id)}
+              disabled={savingLayout}
             >
               {page.name}
             </button>
@@ -339,11 +434,12 @@ export function App() {
               </button>
               <button
                 className="button button--primary"
-                onClick={() => setEditing(false)}
+                onClick={() => void finishEditing()}
+                disabled={savingLayout}
                 aria-label="Terminer la modification"
               >
                 <Lock size={18} />
-                <span>Terminer</span>
+                <span>{savingLayout ? 'Enregistrement…' : 'Terminer'}</span>
               </button>
             </>
           ) : (
@@ -362,7 +458,11 @@ export function App() {
           {isAndroidApp && (
             <button
               className="button button--ghost android-exit-action"
-              onClick={exitToAndroid}
+              onClick={() =>
+                void (async () => {
+                  if (!editing || (await finishEditing())) exitToAndroid();
+                })()
+              }
               aria-label="Quitter HomeDash et revenir à Android"
             >
               <LogOut size={18} />
@@ -400,12 +500,12 @@ export function App() {
           )}
         </div>
         <DashboardGrid
-          key={`${activePage?.id ?? 'none'}-${editing}`}
+          key={`${activePage?.id ?? 'none'}-${layoutEpoch}`}
           instances={instances}
           manifests={data.widgets}
           editing={editing}
           adminUnlocked={adminUnlocked}
-          onLayoutChange={(items) => void saveLayout(items)}
+          onLayoutChange={saveLayout}
           onConfigure={setConfiguredWidget}
           onRemove={(instance) => void removeWidget(instance)}
         />
@@ -417,8 +517,11 @@ export function App() {
           onSuccess={() => {
             setShowAdmin(false);
             setAdminUnlocked(true);
-            if (adminPurpose === 'editing') setEditing(true);
-            else setShowSettings(true);
+            if (adminPurpose === 'editing') {
+              if (!layoutDraftRef.current)
+                editingRevisionRef.current = revisionRef.current[activePage?.id ?? ''] ?? 0;
+              setEditing(true);
+            } else setShowSettings(true);
           }}
         />
       )}

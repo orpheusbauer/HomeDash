@@ -6,6 +6,8 @@ La version `0.4.0` constitue une transition : son installeur ajoute au Raspberry
 
 La version `0.4.2` corrige le premier passage par l’autorisation Android « Installer des applications inconnues ». L’APK est désormais téléchargée et vérifiée avant d’ouvrir ce réglage, puis reprise depuis le cache privé au retour dans HomeDash. Trois tentatives sont effectuées en cas de coupure réseau transitoire et l’interface affiche chaque étape.
 
+La version `0.4.3` corrige la disposition tactile et le service caméra et active les **mises à jour automatiques du serveur Pi**. Si l’agent natif 0.4.0 ou ultérieur fonctionne déjà, installez le serveur 0.4.3 une fois depuis les paramètres de la tablette, puis l’APK 0.4.3. **Aucun nouvel installeur complet ni SSH n’est nécessaire pour cette transition.** La boucle automatique sera ensuite active pour les releases suivantes.
+
 ## Vue d’ensemble
 
 Une mise à jour comporte deux éléments distincts :
@@ -47,7 +49,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.2` et `versionCode = 9`.
+Pour la présente release, les valeurs attendues sont `0.4.3` et `versionCode = 10`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -82,7 +84,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.2: fiabilisation de la mise à jour Android"
+git commit -m "Release 0.4.3: grille stable, caméra et mises à jour automatiques"
 git push origin main
 ```
 
@@ -107,8 +109,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.2 -m "HomeDash 0.4.2"
-git push origin v0.4.2
+git tag -a v0.4.3 -m "HomeDash 0.4.3"
+git push origin v0.4.3
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -124,13 +126,13 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.2**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.3**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.2.tar.gz
-homedash-native-0.4.2.tar.gz.sha256
-homedash-kiosk-0.4.2.apk
-homedash-kiosk-0.4.2.apk.sha256
+homedash-native-0.4.3.tar.gz
+homedash-native-0.4.3.tar.gz.sha256
+homedash-kiosk-0.4.3.apk
+homedash-kiosk-0.4.3.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
@@ -166,11 +168,40 @@ sudo journalctl -u homedash -u homedash-native-updater --since '15 minutes ago' 
 
 Résultat attendu : version `0.4.0`, trois services `active` et réponse HTTP 200.
 
-## Partie C — installer les versions suivantes depuis la tablette
+## Partie C — mises à jour automatiques du Pi, puis APK depuis la tablette
 
 Cette procédure s’applique après la transition serveur 0.4.0.
 
+### C0. Fonctionnement automatique à partir du serveur 0.4.3
+
+Le serveur vérifie GitHub une minute après son démarrage, puis toutes les dix minutes après chaque vérification. La tablette peut être éteinte ou déconnectée. Le Pi doit rester allumé, son service HomeDash actif et son accès Internet disponible.
+
+Une release stable publiée avec un tag exact `vX.Y.Z`, plus récente que la version installée et contenant l’archive native et son SHA-256, est transmise à l’agent natif déjà installé. Les brouillons, préversions, tags seuls et archives incomplètes ne sont pas installés. L’agent conserve ses téléchargements vérifiés, sa sauvegarde préalable, son basculement atomique et son rollback.
+
+Le délai de dix minutes concerne **la détection**, à compter de la publication effective de la Release par le workflow GitHub. Il faut y ajouter le téléchargement et l’installation des dépendances ; cela peut prendre plusieurs minutes sur le Pi Zero. Ne coupez pas son alimentation pendant l’installation. Ensuite, sur la tablette, **Paramètres > Mises à jour > Vérifier > Installer l’application X.Y.Z** reste la seule étape habituelle. Android demande toujours la confirmation d’installation de l’APK.
+
+Une installation déjà en cours n’est pas doublée. Si l’agent signale un échec ou une interruption, la même version n’est pas réinstallée automatiquement en boucle : corrigez et publiez une nouvelle release, ou relancez explicitement l’installation depuis la tablette après diagnostic. Une simple indisponibilité de GitHub est réessayée au passage suivant.
+
+Les valeurs par défaut s’appliquent aussi aux fichiers de configuration existants. Pour les modifier exceptionnellement dans `/etc/homedash/homedash.env` :
+
+```ini
+HOMEDASH_AUTO_UPDATE=true
+HOMEDASH_AUTO_UPDATE_INTERVAL_MS=600000
+```
+
+Utilisez `false` pour désactiver l’installation automatique, puis redémarrez le service `homedash`. Le mode développement n’installe jamais automatiquement de releases. Les opérations privilégiées restent réservées à l’agent natif, sans nouveau service ni nouvelles permissions root.
+
+Pour vérifier les passages de la boucle et les résultats :
+
+```bash
+sudo journalctl -u homedash -u homedash-native-updater --since '30 minutes ago' --no-pager
+sudo cat /var/lib/homedash/data/update-status.json
+cat /var/lib/homedash/installed-version
+```
+
 ### C1. Mettre à jour le serveur Pi
+
+À utiliser pour installer 0.4.3 la première fois, forcer une vérification/installation, ou si l’automatisme est désactivé. Pour les releases suivantes, la section C0 remplace normalement ces manipulations.
 
 1. Gardez la tablette alimentée et le Pi connecté à Internet.
 2. Ouvrez **HomeDash > Paramètres**.
