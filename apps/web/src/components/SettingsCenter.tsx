@@ -391,8 +391,8 @@ export function SettingsCenter({
             Adresse du serveur et association
           </button>
           <p className="form-hint">
-            Pour quitter HomeDash, utilisez le bouton Android dans la barre supérieure ou le bouton
-            Retour de la tablette.
+            Pour quitter HomeDash, glissez depuis le bord inférieur de l’écran puis touchez Accueil
+            ou Retour dans la barre Android.
           </p>
         </section>
       )}

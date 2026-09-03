@@ -8,6 +8,7 @@ export default tseslint.config(
     ignores: [
       '**/dist/**',
       '**/build/**',
+      'output/**',
       '**/node_modules/**',
       '**/.npm-cache/**',
       'apps/web/public/sw.js',

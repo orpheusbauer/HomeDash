@@ -1,15 +1,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  CalendarClock,
-  Clock3,
-  ExternalLink,
-  Link2Off,
-  MapPin,
-  Pencil,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { CalendarClock, Clock3, Link2Off, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { CalendarEvent } from '@homedash/contracts';
 import { api } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -120,17 +111,14 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   const eventCount = groups.reduce((count, group) => count + group.events.length, 0);
   return (
     <div className="calendar-widget">
-      <div className="calendar-toolbar">
-        <span>
-          14 prochains jours · {eventCount} événement{eventCount > 1 ? 's' : ''}
-        </span>
-        {editing && adminUnlocked && (
+      {editing && adminUnlocked && (
+        <div className="calendar-toolbar">
           <button className="calendar-add" onClick={() => setEdited('new')}>
             <Plus size={16} />
             Événement
           </button>
-        )}
-      </div>
+        </div>
+      )}
       {eventCount === 0 ? (
         <div className="calendar-empty">
           <CalendarClock size={30} />
@@ -168,14 +156,6 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
                             <span>{calendarEventSchedule(event)}</span>
                           </div>
                           <strong className="calendar-event__title">{event.title}</strong>
-                          {calendarIds.length > 1 && (
-                            <span className="calendar-event__source">
-                              {calendar?.name ??
-                                (event.calendarId === 'primary'
-                                  ? 'Agenda principal'
-                                  : event.calendarId)}
-                            </span>
-                          )}
                           {event.location && (
                             <div className="calendar-event__location">
                               <MapPin size={15} aria-hidden="true" />
@@ -191,7 +171,7 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
                             </details>
                           )}
                         </div>
-                        {editing && adminUnlocked ? (
+                        {editing && adminUnlocked && (
                           <button
                             className="event-edit"
                             onClick={() => setEdited(event)}
@@ -199,18 +179,6 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
                           >
                             <Pencil size={17} />
                           </button>
-                        ) : (
-                          event.htmlLink && (
-                            <a
-                              className="event-open"
-                              href={event.htmlLink}
-                              target="_blank"
-                              rel="noreferrer"
-                              aria-label={`Ouvrir ${event.title} dans Google Calendar`}
-                            >
-                              <ExternalLink size={17} />
-                            </a>
-                          )
                         )}
                       </li>
                     );

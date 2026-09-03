@@ -60,4 +60,7 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" homedash-native-*.tar.gz homedash-native-*.sha256 homedash-kiosk-*.apk homedash-kiosk-*.apk.sha256 --generate-notes --verify-tag
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          sed "s|](\.\./|](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/docs/|g" "docs/releases/${VERSION}.md" > "$RUNNER_TEMP/release-notes.md"
+          gh release create "$GITHUB_REF_NAME" homedash-native-*.tar.gz homedash-native-*.sha256 homedash-kiosk-*.apk homedash-kiosk-*.apk.sha256 --notes-file "$RUNNER_TEMP/release-notes.md" --verify-tag

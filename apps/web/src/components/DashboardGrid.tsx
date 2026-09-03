@@ -4,6 +4,7 @@ import { Grip, Settings2, Trash2 } from 'lucide-react';
 import type { LayoutItem, WidgetInstance, WidgetManifest } from '@homedash/contracts';
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
+import { WeatherHeaderDetails } from '../widgets/WeatherWidget';
 
 export const GRID_COLUMNS = 48;
 
@@ -194,7 +195,13 @@ export function DashboardGrid({
               <header className="widget-card__header widget-drag-handle">
                 <div className="widget-card__title">
                   {editing && <Grip size={18} />}
-                  <span>{instance.title || manifest?.name || instance.widgetId}</span>
+                  <span className="widget-card__name">
+                    {instance.title || manifest?.name || instance.widgetId}
+                  </span>
+                  {(instance.widgetId === 'weather.forecast' ||
+                    instance.widgetId === 'weather.hourly') && (
+                    <WeatherHeaderDetails instance={instance} />
+                  )}
                 </div>
                 {editing && (
                   <div className="widget-card__actions">

@@ -64,6 +64,26 @@ function useWeather(config: Record<string, unknown>) {
   });
 }
 
+export function WeatherHeaderDetails({ instance }: Pick<WidgetComponentProps, 'instance'>) {
+  const query = useWeather(instance.config);
+  const location = query.data?.location ?? weatherParams(instance.config).location;
+  const day = query.data?.current.time.slice(0, 10);
+  const date =
+    instance.widgetId === 'weather.hourly' && day
+      ? new Date(`${day}T12:00:00`).toLocaleDateString('fr-FR', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+        })
+      : null;
+  const details = [location, date].filter(Boolean).join(' · ');
+  return (
+    <span className="widget-card__metadata" title={details}>
+      · {details}
+    </span>
+  );
+}
+
 export function CurrentWeatherWidget({ instance }: WidgetComponentProps) {
   const query = useWeather(instance.config);
   if (!query.data) {
@@ -182,23 +202,9 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
 
   const weather = query.data;
   const visibleHours = hours.slice(0, visibleHourCount);
-  const today = weather.current.time.slice(0, 10);
 
   return (
     <div className="hourly-weather-widget">
-      <div className="hourly-weather-summary">
-        <div>
-          <strong>{weather.location}</strong>
-          <span>
-            {new Date(`${today}T12:00:00`).toLocaleDateString('fr-FR', {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'long',
-            })}
-          </span>
-        </div>
-        <small>Mise à jour toutes les 15 min</small>
-      </div>
       <div
         className="hourly-weather-list"
         aria-label="Prévisions météo heure par heure"

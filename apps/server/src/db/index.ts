@@ -89,7 +89,7 @@ export function seedDatabase(): void {
       .prepare('INSERT INTO notes(id, content, revision, updated_at) VALUES (?, ?, 0, ?)')
       .run(
         noteId,
-        'Bienvenue dans HomeDash. Touchez « Modifier » pour personnaliser cette page.',
+        'Bienvenue dans HomeDash. Touchez le crayon pour personnaliser cette page.',
         now,
       );
     const widgets: Array<{

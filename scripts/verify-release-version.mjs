@@ -104,4 +104,15 @@ if (currentRelease !== expected) {
   );
 }
 
+const notes = readFileSync(new URL(`../docs/releases/${expected}.md`, import.meta.url), 'utf8');
+if (
+  !notes.startsWith(`# HomeDash ${expected}\n`) &&
+  !notes.startsWith(`# HomeDash ${expected}\r\n`)
+) {
+  throw new Error('Les notes de publication ne correspondent pas à VERSION.');
+}
+if (!notes.includes(`versionCode ${androidCode}`)) {
+  throw new Error('Les notes de publication doivent indiquer le versionCode Android.');
+}
+
 console.log(`Versions de release cohérentes : ${expected} (Android code ${androidCode}).`);

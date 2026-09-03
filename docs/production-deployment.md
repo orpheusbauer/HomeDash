@@ -1,4 +1,4 @@
-# Passage définitif en production — HomeDash 0.3.0
+# Passage définitif en production — HomeDash 0.4.7
 
 Ce document est la procédure courte et ordonnée à suivre maintenant que le Raspberry Pi et la tablette sont physiquement disponibles. Les guides spécialisés donnent les détails et le dépannage : [installation-raspberry-pi.md](installation-raspberry-pi.md), [android-kiosk.md](android-kiosk.md), [updates.md](updates.md), [backup-and-restore.md](backup-and-restore.md) et [crash-loop-recovery.md](crash-loop-recovery.md).
 
@@ -10,7 +10,7 @@ Ce document est la procédure courte et ordonnée à suivre maintenant que le Ra
 - Nginx fournit `https://homedash.local` et l’adresse IP réservée au Pi ;
 - la tablette ouvre automatiquement HomeDash après un reboot ;
 - l’icône HomeDash permet de le relancer à tout moment ;
-- le plein écran masque les barres système, un glissement inférieur rappelle Accueil/Retour/Récentes, le bouton **Android** quitte directement l’application et le délai de veille Android reste actif ;
+- le plein écran masque les barres système, un glissement inférieur rappelle Accueil/Retour/Récentes et le délai de veille Android reste actif ;
 - portrait/paysage se choisit depuis les paramètres ;
 - le réveil facultatif de la dalle par mouvement se configure depuis les paramètres de l’APK ;
 - les futures versions du Pi proviennent des Releases GitHub ;
@@ -53,20 +53,20 @@ git push origin main
 
 Dans **GitHub > Actions > CI**, attendez que `web-server` et `android` soient verts.
 
-### A3. Créer la Release 0.3.0
+### A3. Créer la Release 0.4.7
 
 ```powershell
-git tag -a v0.3.0 -m "HomeDash 0.3.0 - météo horaire et mises à jour Android"
-git push origin v0.3.0
+git tag -a v0.4.7 -m "HomeDash 0.4.7 - météo horaire et mises à jour Android"
+git push origin v0.4.7
 ```
 
 Dans **Actions > Release**, attendez le vert. Vérifiez ces quatre fichiers publiés ; GitHub ajoute séparément ses deux archives « Source code » :
 
 ```text
-homedash-native-0.3.0.tar.gz
-homedash-native-0.3.0.tar.gz.sha256
-homedash-kiosk-0.3.0.apk
-homedash-kiosk-0.3.0.apk.sha256
+homedash-native-0.4.7.tar.gz
+homedash-native-0.4.7.tar.gz.sha256
+homedash-kiosk-0.4.7.apk
+homedash-kiosk-0.4.7.apk.sha256
 ```
 
 ## Phase B — mettre le Raspberry Pi en production
@@ -93,18 +93,18 @@ df -h /
 
 Le Zero original doit afficher `armv6l` et `32`. Notez l’adresse affichée par `hostname -I` et réservez-la dans votre routeur.
 
-### B2. Mettre à jour le clone et installer 0.3.0
+### B2. Mettre à jour le clone et installer 0.4.7
 
 ```bash
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.3.0
+git checkout v0.4.7
 
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.7
 ```
 
-Pour `0.3.0`, l’installeur complet est obligatoire même sur une machine déjà installée : la release conserve les protections de stockage et ajoute la configuration nécessaire au cache APK vérifié. La configuration, la base, les certificats et le token GitHub existants sont conservés.
+Pour `0.4.7`, l’installeur complet est obligatoire même sur une machine déjà installée : la release conserve les protections de stockage et ajoute la configuration nécessaire au cache APK vérifié. La configuration, la base, les certificats et le token GitHub existants sont conservés.
 
 ### B3. Valider le Pi
 
@@ -121,7 +121,7 @@ curl --fail --cacert /var/lib/homedash/tls/root-ca.crt \
 sudo journalctl -u homedash -n 100 --no-pager
 ```
 
-Résultats attendus : version `0.3.0`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
+Résultats attendus : version `0.4.7`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
 
 Un navigateur affichant `502 Bad Gateway nginx` signifie que Nginx est joignable, mais que `curl http://127.0.0.1:4100/health/ready` échoue sur le Pi. Dans ce cas, ne commencez pas la phase tablette : suivez la section 3 de [android-kiosk.md](android-kiosk.md), notamment `systemctl status`, `journalctl` et la relance de l’installeur natif.
 
@@ -133,14 +133,14 @@ Suivez [backup-and-restore.md](backup-and-restore.md), puis copiez l’archive p
 
 ### C1. Retirer une ancienne version debug
 
-Si une ancienne APK debug est installée, désinstallez-la une seule fois avant l’APK signée `0.3.0`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
+Si une ancienne APK debug est installée, désinstallez-la une seule fois avant l’APK signée `0.4.7`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
 
 ### C2. Installer sans câble
 
 Depuis Chrome sur la tablette :
 
-1. ouvrez la Release GitHub `v0.3.0` ;
-2. téléchargez `homedash-kiosk-0.3.0.apk` ;
+1. ouvrez la Release GitHub `v0.4.7` ;
+2. téléchargez `homedash-kiosk-0.4.7.apk` ;
 3. autorisez temporairement l’installation depuis Chrome ;
 4. installez l’APK ;
 5. retirez cette autorisation ;
@@ -162,11 +162,11 @@ Le délai de veille configuré dans Android fonctionne directement avec HomeDash
 
 Vérifiez séparément :
 
-- bouton **Android** dans HomeDash ;
 - glissement depuis le bord inférieur puis bouton Android Retour ;
 - glissement depuis le bord inférieur puis bouton rond Accueil ;
 - relance par l’icône HomeDash ;
-- arrêt de l’indicateur caméra après la sortie ;
+- heure/date centrées et absence de chevauchement de la barre supérieure ;
+- arrêt de l’indicateur caméra après la sortie par **Retour** ;
 - retour du service de présence après réouverture ;
 - extinction selon le délai Android, puis affichage normal de l’écran de verrouillage au réveil ;
 - si le réveil par mouvement est activé : notification permanente, extinction normale, réveil devant la caméra et comportement du verrouillage validés ;
@@ -239,7 +239,7 @@ curl --fail http://127.0.0.1:4100/health/ready
 
 Le projet peut être considéré comme installé proprement lorsque :
 
-- CI et Release `v0.3.0` sont vertes ;
+- CI et Release `v0.4.7` sont vertes ;
 - Pi et Nginx redémarrent seuls ;
 - la tablette possède l’APK signée ;
 - aucun câble/ADB n’est nécessaire au quotidien ;

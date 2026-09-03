@@ -173,14 +173,19 @@ async function render(
 }
 
 describe('présentation de l’agenda', () => {
-  it('affiche les jours, les plages horaires, les sources, le lieu et une description dépliable', async () => {
+  it('affiche les jours, horaires, couleurs et descriptions sans compteur ni liens externes', async () => {
     await render([event(), event({ id: 'family', calendarId: 'family' })]);
     expect(host.querySelector('h3')!.textContent).toContain('jeudi 3 septembre');
     expect(host.textContent).toContain('Aujourd’hui');
     expect(host.textContent).toContain('10:00 – 11:30');
     expect(host.textContent).toContain('Salle des associations');
-    expect(host.textContent).toContain('Personnel');
-    expect(host.textContent).toContain('Famille');
+    expect(host.querySelector('.calendar-toolbar')).toBeNull();
+    expect(host.querySelector('.calendar-event__source')).toBeNull();
+    expect(host.textContent).not.toContain('Personnel');
+    expect(host.textContent).not.toContain('Famille');
+    expect(
+      host.querySelectorAll<HTMLElement>('.calendar-event')[0]!.style.borderLeftColor,
+    ).not.toBe(host.querySelectorAll<HTMLElement>('.calendar-event')[1]!.style.borderLeftColor);
     const description = host.querySelector('details')!;
     expect(description.open).toBe(false);
     await act(async () => description.querySelector('summary')!.click());
@@ -189,7 +194,7 @@ describe('présentation de l’agenda', () => {
       'Préparer le programme & les activités.\nApporter un carnet.',
     );
     expect(description.querySelector('b')).toBeNull();
-    expect(host.querySelectorAll('.event-open')).toHaveLength(2);
+    expect(host.querySelectorAll('.event-open')).toHaveLength(0);
     expect(host.querySelector('.event-edit')).toBeNull();
   });
 
@@ -211,7 +216,7 @@ describe('présentation de l’agenda', () => {
       metadata: false,
       stale: true,
     });
-    expect(host.querySelector('.calendar-event__source')!.textContent).toBe('family');
+    expect(host.querySelector('.calendar-event__source')).toBeNull();
     expect(host.textContent).toContain('Données en cache');
     expect(host.querySelector('details')).toBeNull();
     expect(host.querySelector('.calendar-event__location')).toBeNull();

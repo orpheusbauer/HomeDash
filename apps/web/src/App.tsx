@@ -4,7 +4,6 @@ import {
   CloudOff,
   LayoutDashboard,
   Lock,
-  LogOut,
   Menu,
   Pencil,
   Plus,
@@ -21,7 +20,6 @@ import type {
   SystemMetrics,
   WidgetInstance,
 } from '@homedash/contracts';
-import { exitToAndroid, hasAndroidBridge } from './android-bridge';
 import { api, ApiError, hasAdminSession, realtimeUrl } from './api';
 import { AdminDialog } from './components/AdminDialog';
 import { DashboardGrid } from './components/DashboardGrid';
@@ -30,15 +28,8 @@ import { PageManager } from './components/PageManager';
 import { WidgetCatalog } from './components/WidgetCatalog';
 import { WidgetSettings } from './components/WidgetSettings';
 import { SettingsCenter } from './components/SettingsCenter';
-
-function cachedBootstrap(): BootstrapData | undefined {
-  try {
-    const raw = localStorage.getItem('homedash.bootstrap');
-    return raw ? (JSON.parse(raw) as BootstrapData) : undefined;
-  } catch {
-    return undefined;
-  }
-}
+import { cachedBootstrap, saveBootstrapCache } from './bootstrap-cache';
+import { HeaderClock } from './components/HeaderClock';
 
 export function App() {
   const queryClient = useQueryClient();
@@ -46,7 +37,7 @@ export function App() {
     queryKey: ['bootstrap'],
     queryFn: async ({ signal }) => {
       const data = await api<BootstrapData>('/api/v1/bootstrap', { signal });
-      localStorage.setItem('homedash.bootstrap', JSON.stringify(data));
+      saveBootstrapCache(data);
       return data;
     },
     initialData: cachedBootstrap,
@@ -66,7 +57,6 @@ export function App() {
   const [configuredWidget, setConfiguredWidget] = useState<WidgetInstance | null>(null);
   const [connection, setConnection] = useState<'online' | 'offline' | 'connecting'>('connecting');
   const [toast, setToast] = useState('');
-  const isAndroidApp = hasAndroidBridge();
   const revisionRef = useRef<Record<string, number>>({});
   const editingRevisionRef = useRef(0);
   const layoutDraftRef = useRef<{
@@ -225,11 +215,7 @@ export function App() {
               ...draft.items.find((item) => item.id === instance.id),
             })),
           };
-          try {
-            localStorage.setItem('homedash.bootstrap', JSON.stringify(saved));
-          } catch {
-            /* Cache optional. */
-          }
+          saveBootstrapCache(saved);
           return saved;
         });
         if (layoutDraftRef.current === draft) layoutDraftRef.current = null;
@@ -377,24 +363,27 @@ export function App() {
   return (
     <div className={`app-shell ${editing ? 'app-shell--editing' : ''}`}>
       <header className="topbar">
-        <a className="brand" href="/" aria-label="Accueil HomeDash">
-          <span className="brand-mark">
-            <LayoutDashboard size={22} />
-          </span>
-          <strong>HomeDash</strong>
-        </a>
-        <nav className="page-tabs" aria-label="Pages du dashboard">
-          {data.pages.map((page) => (
-            <button
-              className={page.id === activePage?.id ? 'is-active' : ''}
-              key={page.id}
-              onClick={() => void changePage(page.id)}
-              disabled={savingLayout}
-            >
-              {page.name}
-            </button>
-          ))}
-        </nav>
+        <div className="topbar__navigation">
+          <a className="brand" href="/" aria-label="Accueil HomeDash">
+            <span className="brand-mark">
+              <LayoutDashboard size={22} />
+            </span>
+            <strong>HomeDash</strong>
+          </a>
+          <nav className="page-tabs" aria-label="Pages du dashboard">
+            {data.pages.map((page) => (
+              <button
+                className={page.id === activePage?.id ? 'is-active' : ''}
+                key={page.id}
+                onClick={() => void changePage(page.id)}
+                disabled={savingLayout}
+              >
+                {page.name}
+              </button>
+            ))}
+          </nav>
+        </div>
+        <HeaderClock />
         <div className="topbar__actions">
           <span
             className={`connection-pill connection-pill--${connection}`}
@@ -410,70 +399,33 @@ export function App() {
             </span>
           </span>
           {editing ? (
-            <>
-              <button
-                className="button button--ghost desktop-action"
-                onClick={() => setShowCatalog(true)}
-              >
-                <Plus size={18} />
-                Widget
-              </button>
-              <button
-                className="button button--ghost desktop-action"
-                onClick={() => setShowPages(true)}
-              >
-                <Menu size={18} />
-                Pages
-              </button>
-              <button
-                className="button button--ghost desktop-action"
-                onClick={() => void undoLayout()}
-              >
-                <RotateCcw size={18} />
-                Annuler
-              </button>
-              <button
-                className="button button--primary"
-                onClick={() => void finishEditing()}
-                disabled={savingLayout}
-                aria-label="Terminer la modification"
-              >
-                <Lock size={18} />
-                <span>{savingLayout ? 'Enregistrement…' : 'Terminer'}</span>
-              </button>
-            </>
+            <button
+              className="button button--primary"
+              onClick={() => void finishEditing()}
+              disabled={savingLayout}
+              aria-label="Terminer la modification"
+            >
+              <Lock size={18} />
+              <span>{savingLayout ? 'Enregistrement…' : 'Terminer'}</span>
+            </button>
           ) : (
             <button
-              className="button button--ghost"
+              className="icon-button"
               onClick={requestEditing}
               aria-label="Modifier le dashboard"
+              title="Modifier le dashboard"
             >
               <Pencil size={18} />
-              <span>Modifier</span>
             </button>
           )}
           <button className="icon-button" onClick={requestSettings} aria-label="Paramètres">
             <Settings size={20} />
           </button>
-          {isAndroidApp && (
-            <button
-              className="button button--ghost android-exit-action"
-              onClick={() =>
-                void (async () => {
-                  if (!editing || (await finishEditing())) exitToAndroid();
-                })()
-              }
-              aria-label="Quitter HomeDash et revenir à Android"
-            >
-              <LogOut size={18} />
-              <span>Android</span>
-            </button>
-          )}
         </div>
       </header>
 
       {editing && (
-        <div className="mobile-editbar">
+        <div className="dashboard-editbar">
           <button onClick={() => setShowCatalog(true)}>
             <Plus size={19} />
             Widget
@@ -489,16 +441,7 @@ export function App() {
         </div>
       )}
 
-      <main className="dashboard-main">
-        <div className="page-heading">
-          <div>
-            <span>{editing ? 'Mode édition' : 'Votre espace'}</span>
-            <h1>{activePage?.name}</h1>
-          </div>
-          {editing && (
-            <p>Maintenez une poignée pour déplacer · tirez les coins pour redimensionner</p>
-          )}
-        </div>
+      <main className="dashboard-main" aria-label={activePage?.name ?? 'Dashboard'}>
         <DashboardGrid
           key={`${activePage?.id ?? 'none'}-${layoutEpoch}`}
           instances={instances}

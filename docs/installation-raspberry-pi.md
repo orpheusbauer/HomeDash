@@ -27,19 +27,19 @@ git push origin main
 
 Dans GitHub, ouvrez **Actions > CI**. Le dernier run de `main` doit avoir les jobs `web-server` et `android` verts. Le job web vérifie aussi que l’archive native peut être créée et démarrée.
 
-Les tags déjà publiés ne doivent jamais être déplacés. Avant de créer `v0.3.0`, configurez les quatre secrets de signature décrits dans [android-kiosk.md](android-kiosk.md).
+Les tags déjà publiés ne doivent jamais être déplacés. Avant de créer `v0.4.7`, configurez les quatre secrets de signature décrits dans [android-kiosk.md](android-kiosk.md).
 
 ```powershell
-git tag -a v0.3.0 -m "HomeDash 0.3.0 — météo horaire et mises à jour Android"
-git push origin v0.3.0
+git tag -a v0.4.7 -m "HomeDash 0.4.7 — météo horaire et mises à jour Android"
+git push origin v0.4.7
 ```
 
 Attendez ensuite le workflow **Release**. La release doit contenir au minimum :
 
-- `homedash-native-0.3.0.tar.gz` ;
-- `homedash-native-0.3.0.tar.gz.sha256` ;
-- `homedash-kiosk-0.3.0.apk` ;
-- `homedash-kiosk-0.3.0.apk.sha256`.
+- `homedash-native-0.4.7.tar.gz` ;
+- `homedash-native-0.4.7.tar.gz.sha256` ;
+- `homedash-kiosk-0.4.7.apk` ;
+- `homedash-kiosk-0.4.7.apk.sha256`.
 
 Ne poursuivez pas l’installation si l’archive native ou son fichier SHA-256 manque.
 
@@ -152,11 +152,11 @@ sudo install -d -o "$USER" -g "$USER" -m 0755 /opt/homedash
 git clone "git@github-homedash:${GITHUB_REPOSITORY}.git" /opt/homedash/repository
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.3.0
+git checkout v0.4.7
 git status --short --branch
 ```
 
-Le statut doit être propre et indiquer le tag ou le commit de `v0.3.0`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release. L’installeur déduit automatiquement `VOTRE_COMPTE_GITHUB/HomeDash` depuis ce remote.
+Le statut doit être propre et indiquer le tag ou le commit de `v0.4.7`. Le clone fournit les scripts, unités `systemd` et guides ; l’application compilée sera téléchargée depuis la release. L’installeur déduit automatiquement `VOTRE_COMPTE_GITHUB/HomeDash` depuis ce remote.
 
 ## 7. Créer un token GitHub limité pour télécharger la release privée
 
@@ -187,7 +187,7 @@ Toujours depuis le clone :
 
 ```bash
 cd /opt/homedash/repository
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.3.0
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.7
 ```
 
 Le script effectue les opérations suivantes :
@@ -203,7 +203,7 @@ Le script effectue les opérations suivantes :
 9. arrête et retire l’ancien `homedash-updater.service` Docker s’il subsiste ;
 10. limite les crash loops, désactive les core dumps persistants et borne le journal ;
 11. installe le contrôle du disque à 80 %, 90 % et 95 % ;
-12. télécharge l’archive `v0.3.0` et son SHA-256 depuis GitHub ;
+12. télécharge l’archive `v0.4.7` et son SHA-256 depuis GitHub ;
 13. installe uniquement les dépendances de production du serveur, sans les bibliothèques de build/front déjà compilé et avec les scripts npm désactivés ;
 14. démarre HomeDash et attend `/health/ready` ;
 15. restaure automatiquement la version/base précédente si le health check échoue.
@@ -228,7 +228,7 @@ Valeurs attendues :
 
 - Node `v22.23.1` ;
 - architecture Node `arm` ;
-- version installée `0.3.0` ;
+- version installée `0.4.7` ;
 - services `active (running)` ;
 - timer disque `active (waiting)` et ancien updater `inactive` ou `unknown` ;
 - deux réponses de santé HTTP 200.
@@ -239,7 +239,7 @@ Les fichiers importants sont :
 
 ```text
 /opt/homedash/repository             clone Git et scripts
-/opt/homedash/releases/0.3.0         application précompilée
+/opt/homedash/releases/0.4.7         application précompilée
 /opt/homedash/current                lien vers la release active
 /etc/homedash/homedash.env           secrets et configuration
 /etc/homedash/github-token           token GitHub lecture seule
@@ -277,7 +277,7 @@ Testez ensuite `https://homedash.local` dans Chrome sur la tablette. Il ne doit 
 
 ## 11. Installer et associer l’application Android
 
-Téléchargez l’APK signée `homedash-kiosk-0.3.0.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md). Cette installation manuelle active les futures mises à jour depuis HomeDash. N’utilisez plus l’artifact debug de la CI sur la tablette murale.
+Téléchargez l’APK signée `homedash-kiosk-0.4.7.apk` depuis la GitHub Release, puis suivez [android-kiosk.md](android-kiosk.md). Cette installation manuelle active les futures mises à jour depuis HomeDash. N’utilisez plus l’artifact debug de la CI sur la tablette murale.
 
 Dans l’écran de configuration de l’application, utilisez :
 
@@ -372,9 +372,9 @@ Mise à jour vers une release future :
 ```bash
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.3.0
+git checkout v0.4.7
 sudo install -m 0755 deployment/raspberry-pi-zero/update-native.sh /usr/local/sbin/homedash-update-native
-sudo homedash-update-native v0.3.0
+sudo homedash-update-native v0.4.7
 ```
 
 Consultez [updates.md](updates.md) avant chaque mise à jour et [backup-and-restore.md](backup-and-restore.md) pour les sauvegardes.
@@ -401,7 +401,7 @@ curl --fail --show-error http://127.0.0.1:4100/health/ready
 sudo journalctl -u homedash -n 150 --no-pager
 ```
 
-Si `current`, le code ou la configuration manque, revenez à la section 8 et relancez l’installeur `install-native.sh v0.3.0`. Si les fichiers existent :
+Si `current`, le code ou la configuration manque, revenez à la section 8 et relancez l’installeur `install-native.sh v0.4.7`. Si les fichiers existent :
 
 ```bash
 sudo systemctl reset-failed homedash
@@ -432,7 +432,7 @@ Le binaire doit finir par `node-v22.23.1-linux-armv6l/bin/node`. N’installez p
 
 ### `npm ci` est tué
 
-Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.3.0`.
+Contrôlez `free -h` et les logs OOM. Fermez tout service inutile, créez le swap temporaire décrit plus haut et relancez `sudo homedash-update-native v0.4.7`.
 
 ### Nginx ne démarre pas
 

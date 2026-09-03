@@ -96,7 +96,7 @@ Le résultat attendu est `active` et aucun message `CALENDAR_AUTH_FAILED` dans l
 
 1. Ouvrez **HomeDash > Paramètres** et déverrouillez avec le PIN administrateur.
 2. Dans **Google Calendar**, vérifiez l’état **Connecté**.
-3. Fermez les paramètres et passez en mode **Modifier**.
+3. Fermez les paramètres et touchez le **crayon** pour passer en mode édition.
 4. Touchez **Widget**, puis ajoutez **Google Calendar**.
 5. Laissez l’identifiant `primary` pour afficher l’agenda principal.
 6. Terminez le mode édition.
@@ -105,11 +105,13 @@ Les prochains événements apparaissent dans le widget. Le cache de lecture dure
 
 Depuis la version **0.4.6**, l’agenda regroupe les événements des 14 prochains jours par jour de la semaine, avec des repères « Aujourd’hui » et « Demain ». Chaque événement affiche ses horaires de début et de fin et son lieu lorsqu’il est renseigné. Touchez **Description** pour lire les détails. Les événements sur toute la journée ou sur plusieurs jours indiquent leur période ; faites défiler le widget pour voir la suite de l’agenda.
 
+Depuis **0.4.7**, la présentation est plus compacte : le compteur des événements, les noms/adresses des agendas et les liens pour ouvrir chaque événement dans Google Calendar sont retirés. Les 14 jours restent chargés ; le défilement, les horaires, les lieux, les descriptions et la modification dans HomeDash sont conservés.
+
 ## 6. Vérifier la lecture et l’écriture
 
 1. Créez un événement de test dans Google Calendar et attendez au plus cinq minutes, ou rechargez HomeDash.
 2. Vérifiez qu’il apparaît dans le widget.
-3. Passez en mode **Modifier**, puis touchez **Événement** dans le widget.
+3. Touchez le **crayon** pour passer en mode édition, puis touchez **Événement** dans le widget.
 4. Créez un second événement, changez son titre, puis supprimez-le.
 5. Vérifiez ces trois opérations dans Google Calendar sur le Web.
 
@@ -121,7 +123,7 @@ Le widget utilise `primary` par défaut. Pour un agenda secondaire :
 
 1. ouvrez Google Calendar sur le Web ;
 2. dans **Paramètres de mes agendas > Intégrer l’agenda**, copiez l’**ID de l’agenda** ;
-3. dans HomeDash, passez en mode **Modifier**, ouvrez les réglages du widget Calendar et saisissez les IDs séparés par des virgules ;
+3. dans HomeDash, touchez le **crayon** pour passer en mode édition, ouvrez les réglages du widget Calendar et saisissez les IDs séparés par des virgules ;
 4. touchez **Enregistrer**, puis terminez le mode édition. Les espaces autour des IDs et les doublons sont retirés à l’enregistrement. Un champ vide rétablit `primary`.
 
 Exemple :
@@ -130,7 +132,7 @@ Exemple :
 primary, agenda-famille@group.calendar.google.com
 ```
 
-Les événements de tous les agendas sélectionnés sont réunis dans la même liste chronologique. Le nom et la couleur de l’agenda permettent de les distinguer lorsque Google les fournit ; sinon, son identifiant reste visible.
+Les événements de tous les agendas sélectionnés sont réunis dans la même liste chronologique. La bordure colorée permet de distinguer les agendas lorsque Google fournit leur couleur ; sinon, HomeDash utilise sa couleur par défaut. Les identifiants restent dans les paramètres du widget.
 
 Ne copiez pas l’adresse iCal privée : HomeDash attend un ID d’agenda Google, pas une URL ICS.
 

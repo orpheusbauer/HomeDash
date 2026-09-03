@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,14 +18,17 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -40,7 +44,9 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -53,6 +59,8 @@ import java.security.MessageDigest
 class MainActivity : ComponentActivity() {
     private val preferences by lazy { getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE) }
     private var webView: WebView? = null
+    private var dashboardLoader: DashboardLoader? = null
+    private var dashboardConnection: Job? = null
     private var deviceAdminRequestPending = false
     private var pendingUpdateVersion: String? = null
     private var androidUpdateRunning = false
@@ -98,8 +106,9 @@ class MainActivity : ComponentActivity() {
                 .getString(KEY_PENDING_UPDATE_VERSION, null)
                 ?.takeIf(VERSION_PATTERN::matches)
 
-        val serverUrl = preferences.getString(KEY_SERVER_URL, null)
-        if (serverUrl.isNullOrBlank()) showSetup() else showDashboard(serverUrl)
+        val serverUrl = preferences.getString(KEY_SERVER_ADDRESS, null)
+            ?: preferences.getString(KEY_SERVER_URL, null)
+        if (serverUrl.isNullOrBlank()) showSetup() else connectDashboard(serverUrl)
     }
 
     override fun onResume() {
@@ -196,11 +205,98 @@ class MainActivity : ComponentActivity() {
         applySavedOrientation()
     }
 
+    private fun destroyDashboard() {
+        dashboardLoader?.dispose()
+        dashboardLoader = null
+        webView?.let { view ->
+            (view.parent as? android.view.ViewGroup)?.removeView(view)
+            view.removeJavascriptInterface(ANDROID_BRIDGE_NAME)
+            view.destroy()
+        }
+        webView = null
+    }
+
+    private suspend fun resolveAddress(address: String): String = withContext(Dispatchers.IO) {
+        val normalized = normalizeServerAddress(address, BuildConfig.DEBUG)
+        try {
+            resolveServerAddress(normalized)
+        } catch (error: Exception) {
+            // Retain offline access to the last known Pi when multicast is temporarily unavailable.
+            if (preferences.getString(KEY_SERVER_ADDRESS, null) == normalized) {
+                preferences.getString(KEY_SERVER_URL, null) ?: throw error
+            } else {
+                throw error
+            }
+        }
+    }
+
+    private fun connectDashboard(address: String, errorMessage: String? = null) {
+        dashboardConnection?.cancel()
+        destroyDashboard()
+        val status = TextView(this).apply {
+            text = errorMessage ?: "Recherche du Raspberry Pi…"
+            textSize = 20f
+            gravity = Gravity.CENTER
+        }
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(status)
+            addView(Button(context).apply {
+                text = "Réessayer"
+                setOnClickListener { connectDashboard(address) }
+            })
+            addView(Button(context).apply {
+                text = "Adresse du serveur"
+                setOnClickListener { showSetup() }
+            })
+            addView(Button(context).apply {
+                text = "Retour à Android"
+                setOnClickListener { exitToAndroid() }
+            })
+        }
+        setContentView(layout)
+        if (errorMessage != null) return
+        dashboardConnection = lifecycleScope.launch {
+            try {
+                val normalized = normalizeServerAddress(address, BuildConfig.DEBUG)
+                val resolved = resolveAddress(normalized)
+                preferences.edit()
+                    .putString(KEY_SERVER_ADDRESS, normalized)
+                    .putString(KEY_SERVER_URL, resolved)
+                    .apply()
+                showDashboard(resolved)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                status.text = error.message ?: "Connexion au Raspberry Pi impossible."
+            }
+        }
+    }
+
     private fun showDashboard(serverUrl: String) {
         val allowedOrigin = Uri.parse(serverUrl)
+        destroyDashboard()
         val view = WebView(this)
-        webView?.destroy()
         webView = view
+        val loader = DashboardLoader(
+            view,
+            serverUrl,
+            isCurrent = { webView === view && !isFinishing && !isDestroyed },
+            retry = {
+                connectDashboard(preferences.getString(KEY_SERVER_ADDRESS, serverUrl) ?: serverUrl)
+            },
+            settings = { showSetup() },
+            exit = { exitToAndroid() },
+            ready = {
+                preferences.edit().putInt(KEY_WEB_CACHE_VERSION, BuildConfig.VERSION_CODE).apply()
+            },
+        )
+        dashboardLoader = loader
+        if (preferences.getInt(KEY_WEB_CACHE_VERSION, 0) != BuildConfig.VERSION_CODE) {
+            // Resource cache only: pairing, cookies, notes and preferences survive the update.
+            view.clearCache(true)
+        }
         view.settings.javaScriptEnabled = true
         view.settings.domStorageEnabled = true
         view.settings.databaseEnabled = true
@@ -214,6 +310,14 @@ class MainActivity : ComponentActivity() {
         view.webChromeClient = WebChromeClient()
         view.webViewClient =
             object : WebViewClient() {
+                override fun onPageStarted(webView: WebView?, url: String?, favicon: Bitmap?) {
+                    loader.started()
+                }
+
+                override fun onPageFinished(webView: WebView?, url: String?) {
+                    if (sameOrigin(url, serverUrl)) loader.finished()
+                }
+
                 override fun shouldOverrideUrlLoading(
                     webView: WebView?,
                     request: WebResourceRequest?,
@@ -234,21 +338,37 @@ class MainActivity : ComponentActivity() {
                     error: WebResourceError?,
                 ) {
                     if (request?.isForMainFrame == true) {
-                        Toast.makeText(
-                            this@MainActivity,
-                            "HomeDash hors ligne — reconnexion automatique",
-                            Toast.LENGTH_LONG,
-                        ).show()
-                        webView?.postDelayed(
-                            {
-                                if (!isFinishing && !isDestroyed) webView?.reload()
-                            },
-                            5_000,
-                        )
+                        loader.failed("HomeDash est momentanément inaccessible.")
                     }
                 }
+
+                override fun onReceivedHttpError(
+                    webView: WebView?,
+                    request: WebResourceRequest?,
+                    response: WebResourceResponse?,
+                ) {
+                    if (request?.isForMainFrame == true) {
+                        loader.failed("Le serveur HomeDash redémarre ou ne répond pas.")
+                    }
+                }
+
+                override fun onRenderProcessGone(
+                    view: WebView,
+                    detail: RenderProcessGoneDetail,
+                ): Boolean {
+                    if (this@MainActivity.webView === view) {
+                        connectDashboard(
+                            preferences.getString(KEY_SERVER_ADDRESS, serverUrl) ?: serverUrl,
+                            "L’affichage Android a été interrompu. Touchez Réessayer pour rouvrir HomeDash.",
+                        )
+                    }
+                    return true
+                }
             }
-        setContentView(view)
+        setContentView(FrameLayout(this).apply {
+            addView(view, FrameLayout.LayoutParams(-1, -1))
+            addView(loader.overlay)
+        })
         hideSystemBars()
         view.loadUrl(serverUrl)
         startMonitoringIfAuthorized()
@@ -258,9 +378,9 @@ class MainActivity : ComponentActivity() {
         if (uri.port != -1) uri.port else if (uri.scheme == "https") 443 else 80
 
     private fun showSetup() {
+        dashboardConnection?.cancel()
         stopService(Intent(this, PresenceService::class.java))
-        webView?.destroy()
-        webView = null
+        destroyDashboard()
         val padding = (24 * resources.displayMetrics.density).toInt()
         val layout =
             LinearLayout(this).apply {
@@ -276,8 +396,9 @@ class MainActivity : ComponentActivity() {
             }
         val url =
             EditText(this).apply {
-                hint = "Adresse, ex. https://homedash.local"
-                setText(preferences.getString(KEY_SERVER_URL, "https://homedash.local"))
+                hint = "Nom du Pi ou adresse IP, ex. homedash.local"
+                setText(preferences.getString(KEY_SERVER_ADDRESS, null)
+                    ?: preferences.getString(KEY_SERVER_URL, "https://homedash.local"))
                 isSingleLine = true
             }
         val code =
@@ -376,8 +497,12 @@ class MainActivity : ComponentActivity() {
             }
         }
         button.setOnClickListener {
-            val normalized = url.text.toString().trim().trimEnd('/')
-            if (normalized.isBlank()) return@setOnClickListener
+            val normalized = try {
+                normalizeServerAddress(url.text.toString(), BuildConfig.DEBUG)
+            } catch (error: IllegalArgumentException) {
+                url.error = error.message
+                return@setOnClickListener
+            }
             val selectedOrientation =
                 if (orientationGroup.checkedRadioButtonId == portrait.id) {
                     ORIENTATION_PORTRAIT
@@ -385,18 +510,24 @@ class MainActivity : ComponentActivity() {
                     ORIENTATION_LANDSCAPE
                 }
             button.isEnabled = false
-            lifecycleScope.launch {
+            dashboardConnection = lifecycleScope.launch {
                 try {
+                    val resolved = resolveAddress(normalized)
                     if (code.text.isNotBlank()) {
                         pair(
-                            normalized,
+                            resolved,
                             code.text.toString(),
                             name.text.toString().ifBlank { "Tablette HomeDash" },
                         )
                     }
-                    preferences.edit().putString(KEY_SERVER_URL, normalized).apply()
+                    preferences.edit()
+                        .putString(KEY_SERVER_ADDRESS, normalized)
+                        .putString(KEY_SERVER_URL, resolved)
+                        .apply()
                     setOrientation(selectedOrientation)
-                    showDashboard(normalized)
+                    showDashboard(resolved)
+                } catch (error: CancellationException) {
+                    throw error
                 } catch (error: Exception) {
                     Toast.makeText(
                         this@MainActivity,
@@ -817,14 +948,15 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        webView?.removeJavascriptInterface(ANDROID_BRIDGE_NAME)
-        webView?.destroy()
+        destroyDashboard()
         super.onDestroy()
     }
 
     companion object {
         private const val PREFERENCES_NAME = "homedash"
         private const val KEY_SERVER_URL = "serverUrl"
+        private const val KEY_SERVER_ADDRESS = "serverAddress"
+        private const val KEY_WEB_CACHE_VERSION = "webCacheVersion"
         private const val KEY_ORIENTATION = "orientation"
         private const val KEY_AUTO_SCREEN_OFF = "autoScreenOff"
         private const val KEY_MOTION_WAKE_ENABLED = "motionWakeEnabled"

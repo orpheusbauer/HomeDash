@@ -3,12 +3,12 @@ import { resolve } from 'node:path';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import fastifyStatic from '@fastify/static';
 import websocket from '@fastify/websocket';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { config } from './config.js';
 import { addRealtimeClient } from './realtime.js';
 import { registerApiRoutes } from './routes/api.js';
+import { registerWebAssets } from './web-assets.js';
 
 export async function createApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -44,15 +44,7 @@ export async function createApp(): Promise<FastifyInstance> {
     existsSync(resolve(candidate, 'index.html')),
   );
   if (staticRoot) {
-    await app.register(fastifyStatic, { root: staticRoot, wildcard: false });
-    app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith('/api/')) {
-        return reply
-          .code(404)
-          .send({ error: { code: 'NOT_FOUND', message: 'Endpoint introuvable.' } });
-      }
-      return reply.sendFile('index.html');
-    });
+    await registerWebAssets(app, staticRoot);
   }
   return app;
 }

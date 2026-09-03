@@ -25,15 +25,18 @@ vi.mock('./components/DashboardGrid', () => ({
 }));
 
 const stamp = '2026-09-02T12:00:00Z';
+const home = '00000000-0000-4000-8000-000000000001';
+const clock = '00000000-0000-4000-8000-000000000002';
+const notes = '00000000-0000-4000-8000-000000000003';
 const seed: BootstrapData = {
   version: '0.4.3',
   pages: [
-    { id: 'home', name: 'Accueil', slug: 'home', position: 0, createdAt: stamp, updatedAt: stamp },
+    { id: home, name: 'Accueil', slug: 'home', position: 0, createdAt: stamp, updatedAt: stamp },
   ],
   widgets: [],
   instances: [
-    { id: 'clock', pageId: 'home', widgetId: 'clock', x: 0, y: 0, w: 24, h: 10 },
-    { id: 'notes', pageId: 'home', widgetId: 'notes', x: 0, y: 10, w: 24, h: 10 },
+    { id: clock, pageId: home, widgetId: 'clock', x: 0, y: 0, w: 24, h: 10 },
+    { id: notes, pageId: home, widgetId: 'notes', x: 0, y: 10, w: 24, h: 10 },
   ].map((instance) => ({
     ...instance,
     config: {},
@@ -42,12 +45,12 @@ const seed: BootstrapData = {
     createdAt: stamp,
     updatedAt: stamp,
   })),
-  layoutRevision: { home: 3 },
+  layoutRevision: { [home]: 3 },
   serverTime: stamp,
 };
 const edited: LayoutItem[] = [
-  { id: 'clock', x: 0, y: 0, w: 8, h: 5 },
-  { id: 'notes', x: 8, y: 0, w: 10, h: 5 },
+  { id: clock, x: 0, y: 0, w: 8, h: 5 },
+  { id: notes, x: 8, y: 0, w: 10, h: 5 },
 ];
 let root: Root;
 let host: HTMLDivElement;
@@ -125,7 +128,7 @@ describe('enregistrement par Terminer', () => {
     await act(async () => finish({ revision: 4 }));
     expect(gridProps.editing).toBe(false);
     expect(gridProps.instances.map(({ id, x, y, w, h }) => ({ id, x, y, w, h }))).toEqual(edited);
-    expect(client.getQueryData<BootstrapData>(['bootstrap'])?.layoutRevision.home).toBe(4);
+    expect(client.getQueryData<BootstrapData>(['bootstrap'])?.layoutRevision[home]).toBe(4);
   });
 
   it('conserve le brouillon après une panne réseau et permet de réessayer', async () => {

@@ -6,20 +6,23 @@ La version `0.4.0` constitue une transition : son installeur ajoute au Raspberry
 
 La version `0.4.2` corrige le premier passage par l’autorisation Android « Installer des applications inconnues ». L’APK est désormais téléchargée et vérifiée avant d’ouvrir ce réglage, puis reprise depuis le cache privé au retour dans HomeDash. Trois tentatives sont effectuées en cas de coupure réseau transitoire et l’interface affiche chaque étape.
 
-La version `0.4.3` corrige la disposition tactile et le service caméra et active les **mises à jour automatiques du serveur Pi**. Si l’agent natif 0.4.0 ou ultérieur fonctionne déjà, installez le serveur actuel une fois depuis les paramètres de la tablette. **Aucun nouvel installeur complet ni SSH n’est nécessaire pour cette transition du serveur.** La boucle automatique sera ensuite active pour les releases suivantes. Pour l’APK, utilisez désormais la version 0.4.4 et la procédure ci-dessous si le téléchargement intégré échoue.
+La version `0.4.3` corrige la disposition tactile et le service caméra et active les **mises à jour automatiques du serveur Pi**. Si l’agent natif 0.4.0 ou ultérieur fonctionne déjà, installez le serveur actuel une fois depuis les paramètres de la tablette. **Aucun nouvel installeur complet ni SSH n’est nécessaire pour cette transition du serveur.** La boucle automatique sera ensuite active pour les releases suivantes. Pour l’APK, utilisez désormais la version 0.4.7 et la procédure ci-dessous si le téléchargement intégré échoue.
 
-La version `0.4.4` corrige l’erreur **A WebView method was called on thread 'DefaultDispatcher-worker-…'** de l’installateur Android : l’adresse affichée par la WebView est maintenant lue sur le thread principal, avant le téléchargement en arrière-plan. Les nouvelles tentatives réutilisent cette même adresse. **Si cette erreur apparaît dans l’APK déjà installée, installez manuellement l’APK signée 0.4.4 une fois**, selon la procédure de dépannage ci-dessous ; une mise à jour du serveur ne peut pas corriger le code natif de l’ancienne APK.
+La version `0.4.4` corrige l’erreur **A WebView method was called on thread 'DefaultDispatcher-worker-…'** de l’installateur Android : l’adresse affichée par la WebView est maintenant lue sur le thread principal, avant le téléchargement en arrière-plan. Les nouvelles tentatives réutilisent cette même adresse. **Si cette erreur apparaît dans l’APK déjà installée, installez manuellement l’APK signée actuelle 0.4.7 une fois**, selon la procédure de dépannage ci-dessous ; une mise à jour du serveur ne peut pas corriger le code natif de l’ancienne APK.
 
 La version `0.4.5` corrige l’installation automatique du Pi : npm utilisait `/root/.npm`, inaccessible depuis le service protégé par `ProtectHome=true`. Un cache temporaire privé est maintenant passé explicitement à npm et nettoyé après l’installation. Le statut et le journal donnent aussi l’erreur npm réelle, et la boucle explique la suspension d’une version ayant échoué. **Installeur complet 0.4.5 ou ultérieur requis une fois en SSH** : la publication d’une nouvelle archive applicative ne remplace pas le script privilégié déjà installé. Si cette réparation n’a pas encore été appliquée, utilisez la release actuelle selon la procédure ci-dessous.
 
-## Nouveautés de la release 0.4.6
+## Nouveautés de la release 0.4.7
 
-- **Plusieurs agendas Google** : les virgules et les espaces restent dans le champ pendant la saisie. À l’enregistrement, HomeDash retire les espaces autour des identifiants, les entrées vides et les doublons. Un champ vide rétablit l’agenda `primary`.
-- **Agenda plus lisible** : regroupement par jour de la semaine en toutes lettres, repères **Aujourd’hui** et **Demain**, horaires de début et de fin, lieux et descriptions dépliables.
-- **Périodes et sources** : affichage des événements sur toute la journée ou sur plusieurs jours, avec le nom et la couleur des agendas lorsque Google les fournit.
-- **Défilement** : les événements chargés sur les 14 prochains jours restent accessibles au-delà des huit premiers.
+- **Démarrage tablette** : cache Web corrigé, erreurs de redémarrage exclues du cache, fichiers JavaScript manquants traités correctement, vérification des données locales et récupération native de l’affichage. L’association, les réglages et les brouillons sont conservés.
+- **Adresse du Pi** : saisie d’un nom ou d’une IP avec ajout automatique de HTTPS ; résolution Android puis mDNS IPv4 pour les noms en `.local`, avec conservation du nom et de la dernière IP connue.
+- **Barre supérieure** : suppression de « Votre espace / Accueil » au-dessus de la grille et du bouton Android, bouton d’édition réduit au crayon, heure et date centrées. Les outils d’édition restent accessibles dans leur barre dédiée.
+- **Google Calendar** : suppression du résumé « 14 prochains jours / X événements », des noms ou adresses d’agendas dans les cartes et des liens externes par événement. Les couleurs, horaires, lieux, descriptions et actions d’édition restent disponibles.
+- **Météo** : localisation à droite du titre des prévisions quotidiennes ; localisation et date à droite du titre des prévisions horaires. La ligne de résumé sous le titre horaire est supprimée.
 
-Ces changements sont fournis par la mise à jour du serveur Pi. Depuis une installation dont l’installeur 0.4.5 ou ultérieur est déjà en place, la mise à jour applicative habituelle suffit. L’APK est également versionnée **0.4.6**, avec **versionCode 13**. Les identifiants OAuth, agendas configurés et dispositions existantes sont conservés. Le [guide Google Calendar](google-calendar.md) détaille l’utilisation du widget.
+La release comprend le serveur, l’interface Web, les contrats et l’APK **0.4.7**, avec **versionCode 14**. Les widgets Calendar, prévisions quotidiennes et météo horaire portent également la version **0.4.7**. Voir les [notes de publication complètes](releases/0.4.7.md).
+
+Depuis une installation dont l’installeur 0.4.5 ou ultérieur est déjà en place, la mise à jour applicative du serveur puis de l’APK suffit : cette release ne change ni l’agent privilégié, ni Nginx, ni le runtime ARMv6. Les identifiants OAuth, agendas configurés et dispositions existantes sont conservés.
 
 ## Vue d’ensemble
 
@@ -54,7 +57,8 @@ Mettez le même numéro dans :
 - les dépendances internes `@homedash/contracts` ;
 - `package-lock.json`, à la racine et dans ses entrées de workspaces ;
 - le fallback `HOMEDASH_VERSION` dans `apps/server/src/config.ts` ;
-- `versionName` dans `apps/android/app/build.gradle.kts`.
+- `versionName` dans `apps/android/app/build.gradle.kts` ;
+- les notes de publication `docs/releases/X.Y.Z.md`, reprises par le workflow Release.
 
 Actualisez aussi la version du widget modifié dans `apps/server/src/widget-catalog.ts`, la présentation du `README.md`, les commandes et noms d’assets de ce guide et le lien `current` illustré dans `docs/architecture.md`.
 
@@ -66,7 +70,7 @@ Le contrôle automatisé doit réussir :
 npm.cmd run release:check
 ```
 
-Pour la présente release, les valeurs attendues sont `0.4.6` et `versionCode = 13`.
+Pour la présente release, les valeurs attendues sont `0.4.7` et `versionCode = 14`.
 
 ### A3. Exécuter tous les contrôles locaux
 
@@ -92,7 +96,7 @@ Corrigez toute erreur avant de continuer. Lisez la sortie de `git status --short
 Ajoutez uniquement les fichiers voulus, puis contrôlez ce qui sera committé :
 
 ```powershell
-git add VERSION package.json package-lock.json apps packages deployment docs scripts .github README.md .env.example
+git add VERSION package.json package-lock.json apps packages deployment docs scripts .github README.md .env.example .prettierignore eslint.config.js
 git diff --cached --check
 git diff --cached --stat
 git status --short
@@ -101,7 +105,7 @@ git status --short
 Créez le commit puis poussez :
 
 ```powershell
-git commit -m "Release 0.4.6: agendas multiples et calendrier plus lisible"
+git commit -m "Release 0.4.7: démarrage tablette fiable et interface compacte"
 git push origin main
 ```
 
@@ -126,8 +130,8 @@ Vérifiez que `HEAD` correspond bien au commit vert :
 ```powershell
 git status --short
 git log -1 --oneline
-git tag -a v0.4.6 -m "HomeDash 0.4.6"
-git push origin v0.4.6
+git tag -a v0.4.7 -m "HomeDash 0.4.7"
+git push origin v0.4.7
 ```
 
 Le push du tag lance automatiquement le workflow **Release**. Ne créez pas manuellement une Release vide dans l’interface GitHub.
@@ -143,18 +147,18 @@ Dans **GitHub > Actions > Release**, attendez le vert. Le workflow :
 5. compile l’APK release signée et son SHA-256 ;
 6. publie la GitHub Release.
 
-Dans **Releases > v0.4.6**, vérifiez la présence des quatre fichiers :
+Dans **Releases > v0.4.7**, vérifiez la présence des quatre fichiers :
 
 ```text
-homedash-native-0.4.6.tar.gz
-homedash-native-0.4.6.tar.gz.sha256
-homedash-kiosk-0.4.6.apk
-homedash-kiosk-0.4.6.apk.sha256
+homedash-native-0.4.7.tar.gz
+homedash-native-0.4.7.tar.gz.sha256
+homedash-kiosk-0.4.7.apk
+homedash-kiosk-0.4.7.apk.sha256
 ```
 
 N’installez rien si un fichier manque ou si le workflow est rouge. Corrigez le projet et publiez un nouveau numéro ; ne remplacez pas discrètement les fichiers d’un tag existant.
 
-Pour cette release, reprenez les nouveautés de l’agenda décrites en début de guide dans les notes de publication. Rappelez également que les installations dont l’installeur date d’avant 0.4.5 doivent appliquer la réparation ci-dessous une fois.
+Le workflow publie les notes de `docs/releases/0.4.7.md` avec la release. Rappelez également que les installations dont l’installeur date d’avant 0.4.5 doivent appliquer la réparation ci-dessous une fois.
 
 ## Réparation unique du cache npm — installeur 0.4.5 ou ultérieur requis
 
@@ -169,17 +173,17 @@ homedash-update-native terminé avec code 254
 
 La détection GitHub a fonctionné : l’échec arrive pendant l’installation des dépendances, avant l’arrêt et le basculement du serveur. Les avertissements `ENOTEMPTY` et `TAR_ENTRY_ERROR` qui l’accompagnent sont des conséquences du nettoyage npm après cet échec. Ne supprimez pas les releases actives et ne désactivez pas `ProtectHome`.
 
-Après publication complète de **v0.4.6**, connectez-vous au Pi en SSH si cette réparation n’a pas encore été appliquée. Assurez-vous qu’aucune installation n’est en cours (`update-status.json` ne doit pas indiquer `installing`), puis :
+Après publication complète de **v0.4.7**, connectez-vous au Pi en SSH si cette réparation n’a pas encore été appliquée. Assurez-vous qu’aucune installation n’est en cours (`update-status.json` ne doit pas indiquer `installing`), puis :
 
 ```bash
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.4.6
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.6
+git checkout v0.4.7
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.7
 ```
 
-Si `git status --short` montre des changements, arrêtez-vous avant le `checkout` et préservez-les. L’installeur remplace le script et l’agent natifs, puis installe le serveur 0.4.6 en conservant configuration, association, certificat et données. Sur un Zero, patientez jusqu’au message final ; ne coupez pas l’alimentation.
+Si `git status --short` montre des changements, arrêtez-vous avant le `checkout` et préservez-les. L’installeur remplace le script et l’agent natifs, puis installe le serveur 0.4.7 en conservant configuration, association, certificat et données. Sur un Zero, patientez jusqu’au message final ; ne coupez pas l’alimentation.
 
 Vérifiez ensuite :
 
@@ -190,7 +194,7 @@ curl --fail http://127.0.0.1:4100/health/ready
 sudo journalctl -u homedash -u homedash-native-updater --since '15 minutes ago' --no-pager
 ```
 
-Résultat attendu : **0.4.6**, trois services actifs et HTTP 200. Le statut JSON peut encore décrire la dernière tentative effectuée par l’agent, antérieure à cette installation SSH : le fichier `installed-version` et le contrôle de santé vérifient l’installation réelle. Pour les prochaines releases applicatives, la boucle de dix minutes peut à nouveau télécharger et installer sans SSH. Les modifications futures de l’installateur privilégié restent des transitions annoncées explicitement.
+Résultat attendu : **0.4.7**, trois services actifs et HTTP 200. Le statut JSON peut encore décrire la dernière tentative effectuée par l’agent, antérieure à cette installation SSH : le fichier `installed-version` et le contrôle de santé vérifient l’installation réelle. Pour les prochaines releases applicatives, la boucle de dix minutes peut à nouveau télécharger et installer sans SSH. Les modifications futures de l’installateur privilégié restent des transitions annoncées explicitement.
 
 Le message `Permission denied` de `cat /var/lib/homedash/installed-version` sans `sudo` est indépendant de l’échec npm : le dossier parent est volontairement protégé. Utilisez `sudo cat`, sans élargir ses permissions.
 
@@ -305,6 +309,16 @@ sudo bash deployment/raspberry-pi-zero/install-native.sh vX.Y.Z
 Ce garde-fou empêche l’agent privilégié de modifier son propre périmètre ou d’exécuter des commandes arbitraires depuis l’interface Web.
 
 ## Dépannage
+
+### Écran blanc après une mise à jour — corrigé en 0.4.7
+
+Le correctif 0.4.7 concerne le serveur et l’APK. Le cache Web ne conserve plus les erreurs reçues pendant le redémarrage du Pi et ne renvoie plus une page HTML à la place d’un script manquant. Le serveur force une nouvelle lecture de la page de démarrage et du service worker. Les données locales d’un ancien format sont ignorées et remplacées par la réponse du serveur.
+
+L’APK détecte une interface qui ne démarre pas, tente une réparation du cache des ressources et propose **Réessayer**, **Adresse du serveur** et **Retour à Android** si la connexion reste impossible. Cette réparation ne supprime ni les préférences Android, ni l’association, ni les cookies, ni les brouillons de notes. Elle s’exécute indépendamment des scripts du dashboard.
+
+Après publication de la release 0.4.7, mettre à jour le serveur puis l’APK signée 0.4.7 (versionCode 14). Si l’ancienne APK est déjà bloquée sur un écran blanc, ouvrir la nouvelle APK signée depuis le navigateur ou le gestionnaire de fichiers et choisir **Mettre à jour**, sans désinstaller HomeDash ni effacer ses données.
+
+Vérification sur tablette : conserver une tablette associée et un brouillon de note, mettre à jour l’APK, puis vérifier l’association, l’orientation et le brouillon. Tester aussi un redémarrage du Pi pendant le chargement, un démarrage hors ligne après avoir chargé le dashboard, puis un retour du réseau. Les tests automatisés couvrent les réponses 502, les scripts manquants, le nettoyage ciblé et les données locales incompatibles ; un essai sur la tablette reste nécessaire.
 
 ### Erreur rouge « A WebView method was called on thread … » pendant la mise à jour APK
 
