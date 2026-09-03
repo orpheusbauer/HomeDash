@@ -48,7 +48,7 @@ function readVersion(): string {
       // The image can inject HOMEDASH_VERSION when VERSION is not beside the process.
     }
   }
-  return process.env.HOMEDASH_VERSION ?? '0.4.5';
+  return process.env.HOMEDASH_VERSION ?? '0.4.6';
 }
 
 export const config = {

@@ -112,7 +112,7 @@ export const widgetCatalog: WidgetManifest[] = [
     description: 'Événements à venir et gestion de Google Calendar depuis HomeDash.',
     category: 'Organisation',
     icon: 'CalendarDays',
-    version: '0.1.0',
+    version: '0.4.6',
     size: { min: { w: 16, h: 12 }, default: { w: 32, h: 20 }, max: { w: 48, h: 48 } },
     capabilities: ['calendar', 'network'],
     configSchema: { calendarIds: 'string[]' },

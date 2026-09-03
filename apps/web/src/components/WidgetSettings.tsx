@@ -17,6 +17,9 @@ export function WidgetSettings({
 }) {
   const [title, setTitle] = useState(instance.title ?? '');
   const [config, setConfig] = useState<Record<string, unknown>>(instance.config);
+  const [calendarIdsText, setCalendarIdsText] = useState(
+    Array.isArray(instance.config.calendarIds) ? instance.config.calendarIds.join(', ') : 'primary',
+  );
   const sensors = useQuery({
     queryKey: ['sensors'],
     queryFn: () => api<Sensor[]>('/api/v1/sensors'),
@@ -25,6 +28,25 @@ export function WidgetSettings({
     setConfig((current) => ({ ...current, [key]: value }));
   const textConfig = (key: string, fallback: string) =>
     typeof config[key] === 'string' ? config[key] : fallback;
+  const save = () => {
+    if (instance.widgetId !== 'calendar') {
+      onSave(title.trim() || null, config);
+      return;
+    }
+    // Keep separators in the draft so typing a comma never rewrites the input.
+    const calendarIds = [
+      ...new Set(
+        calendarIdsText
+          .split(',')
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ),
+    ];
+    onSave(title.trim() || null, {
+      ...config,
+      calendarIds: calendarIds.length ? calendarIds : ['primary'],
+    });
+  };
 
   return (
     <Modal
@@ -35,11 +57,7 @@ export function WidgetSettings({
           <button className="button button--ghost" type="button" onClick={onClose}>
             Annuler
           </button>
-          <button
-            className="button button--primary"
-            type="button"
-            onClick={() => onSave(title.trim() || null, config)}
-          >
+          <button className="button button--primary" type="button" onClick={save}>
             Enregistrer
           </button>
         </>
@@ -137,16 +155,12 @@ export function WidgetSettings({
           <label className="field">
             <span>Identifiants de calendriers</span>
             <input
-              value={Array.isArray(config.calendarIds) ? config.calendarIds.join(', ') : 'primary'}
-              onChange={(event) =>
-                set(
-                  'calendarIds',
-                  event.target.value
-                    .split(',')
-                    .map((value) => value.trim())
-                    .filter(Boolean),
-                )
-              }
+              value={calendarIdsText}
+              onChange={(event) => setCalendarIdsText(event.target.value)}
+              placeholder="primary, agenda-famille@group.calendar.google.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
             />
             <small>Utilisez « primary » ou séparez plusieurs identifiants par des virgules.</small>
           </label>

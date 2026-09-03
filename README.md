@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.5` fournit déjà :
+La version `0.4.6` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -24,9 +24,11 @@ La version `0.4.5` fournit déjà :
 - édition stable dans une grille de référence unique, sauvegarde complète attendue par **Terminer**, reprise des gestes tactiles annulés ;
 - diagnostic des images caméra, reprise automatique et analyse indépendante du réseau ;
 - installation automatique des releases natives sur le Pi toutes les dix minutes, sans tablette ouverte ni SSH pour les releases applicatives suivantes ;
-- cache npm temporaire compatible avec les protections du service natif, erreurs npm détaillées et test sous `systemd` isolé (correctif 0.4.5).
+- cache npm temporaire compatible avec les protections du service natif, erreurs npm détaillées et test sous `systemd` isolé (correctif 0.4.5) ;
+- saisie de plusieurs agendas Google séparés par des virgules, conservées pendant la frappe puis normalisées à l’enregistrement (0.4.6) ;
+- agenda regroupé par jour de la semaine, repères **Aujourd’hui** et **Demain**, horaires de début et de fin, lieux, descriptions dépliables, noms et couleurs des agendas ; prise en charge des événements sur plusieurs jours et défilement au-delà des huit premiers événements (0.4.6).
 
-**Transition 0.4.5 : installeur complet requis une fois sur le Pi**, car le correctif remplace l’installateur privilégié déjà présent. Publier la release seule ne répare pas ce script. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
+La release **0.4.6** apporte les améliorations de l’agenda via la mise à jour du serveur Pi. Si l’installeur du Pi date d’avant **0.4.5**, appliquez une fois l’installeur complet de la release actuelle pour bénéficier du correctif du cache npm. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 

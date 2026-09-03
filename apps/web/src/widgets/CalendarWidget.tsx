@@ -1,11 +1,34 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, ExternalLink, Link2Off, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  CalendarClock,
+  Clock3,
+  ExternalLink,
+  Link2Off,
+  MapPin,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import type { CalendarEvent } from '@homedash/contracts';
 import { api } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
 import type { WidgetComponentProps } from './types';
+import {
+  calendarDayLabel,
+  calendarDescriptionText,
+  calendarEventSchedule,
+  calendarRelativeDay,
+  groupCalendarEvents,
+} from './calendar-display';
+
+interface CalendarInfo {
+  id: string;
+  name: string;
+  primary: boolean;
+  color: string | null;
+}
 
 function localDateTime(value: string): string {
   const date = new Date(value);
@@ -22,6 +45,12 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   const statusQuery = useQuery({
     queryKey: ['calendar-status'],
     queryFn: () => api<{ configured: boolean }>('/api/v1/calendar/status'),
+  });
+  const calendarsQuery = useQuery({
+    queryKey: ['calendar-list'],
+    queryFn: () => api<CalendarInfo[]>('/api/v1/calendar/calendars'),
+    enabled: statusQuery.data?.configured === true && calendarIds.length > 1,
+    staleTime: 5 * 60_000,
   });
   const eventsQuery = useQuery({
     queryKey: ['calendar-events', calendarIds],
@@ -84,69 +113,113 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   if (!eventsQuery.data)
     return (
       <div className="widget-centered">
-        <StatusBadge status={eventsQuery.isError ? 'error' : 'loading'} />
+        <StatusBadge status={statusQuery.isError || eventsQuery.isError ? 'error' : 'loading'} />
       </div>
     );
+  const groups = groupCalendarEvents(eventsQuery.data.events);
+  const eventCount = groups.reduce((count, group) => count + group.events.length, 0);
   return (
     <div className="calendar-widget">
-      {editing && adminUnlocked && (
-        <button className="calendar-add" onClick={() => setEdited('new')}>
-          <Plus size={16} />
-          Événement
-        </button>
-      )}
-      {eventsQuery.data.events.length === 0 ? (
+      <div className="calendar-toolbar">
+        <span>
+          14 prochains jours · {eventCount} événement{eventCount > 1 ? 's' : ''}
+        </span>
+        {editing && adminUnlocked && (
+          <button className="calendar-add" onClick={() => setEdited('new')}>
+            <Plus size={16} />
+            Événement
+          </button>
+        )}
+      </div>
+      {eventCount === 0 ? (
         <div className="calendar-empty">
           <CalendarClock size={30} />
           <strong>Aucun événement à venir</strong>
         </div>
       ) : (
-        <ol className="event-list">
-          {eventsQuery.data.events.slice(0, 8).map((event) => (
-            <li key={`${event.calendarId}-${event.id}`}>
-              <time>
-                <strong>
-                  {new Date(event.start).toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: 'short',
+        <div className="calendar-days">
+          {groups.map((group) => {
+            const relativeDay = calendarRelativeDay(group.date);
+            return (
+              <section className="calendar-day" key={group.key}>
+                <h3 className="calendar-day__heading">
+                  <time dateTime={group.key}>{calendarDayLabel(group.date)}</time>
+                  {relativeDay && <span className="calendar-day__relative">{relativeDay}</span>}
+                </h3>
+                <ol className="event-list">
+                  {group.events.map((event) => {
+                    const calendar = calendarsQuery.data?.find(
+                      (item) =>
+                        item.id === event.calendarId ||
+                        (event.calendarId === 'primary' && item.primary),
+                    );
+                    const description = event.description
+                      ? calendarDescriptionText(event.description)
+                      : '';
+                    return (
+                      <li
+                        className="calendar-event"
+                        key={`${event.calendarId}-${event.id}`}
+                        style={{ borderLeftColor: calendar?.color ?? 'var(--accent)' }}
+                      >
+                        <div className="calendar-event__content">
+                          <div className="calendar-event__schedule">
+                            <Clock3 size={15} aria-hidden="true" />
+                            <span>{calendarEventSchedule(event)}</span>
+                          </div>
+                          <strong className="calendar-event__title">{event.title}</strong>
+                          {calendarIds.length > 1 && (
+                            <span className="calendar-event__source">
+                              {calendar?.name ??
+                                (event.calendarId === 'primary'
+                                  ? 'Agenda principal'
+                                  : event.calendarId)}
+                            </span>
+                          )}
+                          {event.location && (
+                            <div className="calendar-event__location">
+                              <MapPin size={15} aria-hidden="true" />
+                              <span>{event.location}</span>
+                            </div>
+                          )}
+                          {description && (
+                            <details className="calendar-event__description">
+                              <summary aria-label={`Description de ${event.title}`}>
+                                Description
+                              </summary>
+                              <p>{description}</p>
+                            </details>
+                          )}
+                        </div>
+                        {editing && adminUnlocked ? (
+                          <button
+                            className="event-edit"
+                            onClick={() => setEdited(event)}
+                            aria-label={`Modifier ${event.title}`}
+                          >
+                            <Pencil size={17} />
+                          </button>
+                        ) : (
+                          event.htmlLink && (
+                            <a
+                              className="event-open"
+                              href={event.htmlLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Ouvrir ${event.title} dans Google Calendar`}
+                            >
+                              <ExternalLink size={17} />
+                            </a>
+                          )
+                        )}
+                      </li>
+                    );
                   })}
-                </strong>
-                <span>
-                  {event.allDay
-                    ? 'Journée'
-                    : new Date(event.start).toLocaleTimeString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                </span>
-              </time>
-              <div>
-                <strong>{event.title}</strong>
-                {event.location && <span>{event.location}</span>}
-              </div>
-              {editing && adminUnlocked ? (
-                <button
-                  className="event-edit"
-                  onClick={() => setEdited(event)}
-                  aria-label={`Modifier ${event.title}`}
-                >
-                  <Pencil size={16} />
-                </button>
-              ) : (
-                event.htmlLink && (
-                  <a
-                    href={event.htmlLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Ouvrir ${event.title}`}
-                  >
-                    <ExternalLink size={17} />
-                  </a>
-                )
-              )}
-            </li>
-          ))}
-        </ol>
+                </ol>
+              </section>
+            );
+          })}
+        </div>
       )}
       <StatusBadge status={eventsQuery.data.stale ? 'stale' : 'ready'} />
       {edited && (
