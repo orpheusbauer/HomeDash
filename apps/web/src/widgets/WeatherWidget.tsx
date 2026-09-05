@@ -7,6 +7,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { WeatherIcon, weatherLabel } from './shared';
 import { TemperatureTrendChart } from './TemperatureTrendChart';
 import type { WidgetComponentProps } from './types';
+import { hourlyWidgetRefresh } from '../widget-refresh';
 
 const WEATHER_ITEM_GAP = 7;
 
@@ -60,7 +61,7 @@ function useWeather(config: Record<string, unknown>) {
       api<WeatherData>(
         `/api/v1/weather?${new URLSearchParams({ ...params, latitude: String(params.latitude), longitude: String(params.longitude) })}`,
       ),
-    refetchInterval: 15 * 60_000,
+    ...hourlyWidgetRefresh,
   });
 }
 
@@ -223,7 +224,7 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
                     minute: '2-digit',
                   })}
             </time>
-            <WeatherIcon code={hour.weatherCode} size={28} />
+            <WeatherIcon code={hour.weatherCode} isDay={hour.isDay} size={28} />
             <strong>{Math.round(hour.temperature)}°</strong>
             <span className="hourly-weather-rain">
               <Droplets className="weather-water-icon" size={13} />

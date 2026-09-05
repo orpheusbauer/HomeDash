@@ -159,6 +159,7 @@ export const weatherSchema = z.object({
       temperature: z.number(),
       humidity: z.number().nullable(),
       weatherCode: z.number().int(),
+      isDay: z.boolean(),
       precipitationProbability: z.number().nullable(),
     }),
   ),

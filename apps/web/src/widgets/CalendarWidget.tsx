@@ -13,6 +13,7 @@ import {
   calendarRelativeDay,
   groupCalendarEvents,
 } from './calendar-display';
+import { hourlyWidgetRefresh } from '../widget-refresh';
 
 interface CalendarInfo {
   id: string;
@@ -36,12 +37,13 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   const statusQuery = useQuery({
     queryKey: ['calendar-status'],
     queryFn: () => api<{ configured: boolean }>('/api/v1/calendar/status'),
+    ...hourlyWidgetRefresh,
   });
   const calendarsQuery = useQuery({
     queryKey: ['calendar-list'],
     queryFn: () => api<CalendarInfo[]>('/api/v1/calendar/calendars'),
     enabled: statusQuery.data?.configured === true && calendarIds.length > 1,
-    staleTime: 5 * 60_000,
+    ...hourlyWidgetRefresh,
   });
   const eventsQuery = useQuery({
     queryKey: ['calendar-events', calendarIds],
@@ -50,7 +52,7 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
         `/api/v1/calendar/events?calendarIds=${encodeURIComponent(calendarIds.join(','))}&days=14`,
       ),
     enabled: statusQuery.data?.configured === true,
-    refetchInterval: 5 * 60_000,
+    ...hourlyWidgetRefresh,
   });
   const saveEvent = useMutation({
     mutationFn: async (values: { title: string; start: string; end: string; location: string }) => {

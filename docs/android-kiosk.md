@@ -1,6 +1,6 @@
 # Tablette Android — installation murale de production
 
-Ce guide cible une tablette sous Android 10 ou ultérieur. HomeDash `0.4.7` utilise le plein écran immersif Android : la barre d’état et la barre de navigation sont masquées pendant l’affichage, mais un glissement depuis le bord inférieur fait réapparaître temporairement Retour, Accueil et les applications récentes. L’application ne devient ni lanceur Android, ni mode kiosque verrouillé ; la sortie se fait avec les gestes système ; le bouton Android a été retiré de la barre supérieure en 0.4.7.
+Ce guide cible une tablette sous Android 10 ou ultérieur. HomeDash `0.4.8` utilise le plein écran immersif Android : la barre d’état et la barre de navigation sont masquées pendant l’affichage, mais un glissement depuis le bord inférieur fait réapparaître temporairement Retour, Accueil et les applications récentes. L’application ne devient ni lanceur Android, ni mode kiosque verrouillé ; la sortie se fait avec les gestes système ; le bouton Android a été retiré de la barre supérieure en 0.4.7.
 
 HomeDash conserve en parallèle les fonctions murales utiles : icône dédiée, ouverture automatique après redémarrage, reconnexion au Pi et détection locale de présence. Le délai de veille et le verrouillage configurés dans Android restent applicables pendant l’affichage. Le réveil de l’écran par mouvement est une option distincte, désactivée par défaut : lorsqu’elle est active, la caméra continue son analyse locale pendant que la dalle est éteinte. Le verrouillage anticipé après absence reste une seconde option indépendante. Les deux sont expliquées à la section 8.
 
@@ -67,15 +67,15 @@ Le workflow Release s’arrête volontairement si un secret manque. Il publie en
 Depuis le PC, après une CI verte :
 
 ```powershell
-git tag -a v0.4.7 -m "HomeDash 0.4.7 - météo horaire et mises à jour Android"
-git push origin v0.4.7
+git tag -a v0.4.8 -m "HomeDash 0.4.8 - actualisation horaire et météo nocturne"
+git push origin v0.4.8
 ```
 
-Dans GitHub, ouvrez **Actions > Release** et attendez le vert. Dans **Releases > v0.4.7**, vérifiez la présence de :
+Dans GitHub, ouvrez **Actions > Release** et attendez le vert. Dans **Releases > v0.4.8**, vérifiez la présence de :
 
 ```text
-homedash-kiosk-0.4.7.apk
-homedash-kiosk-0.4.7.apk.sha256
+homedash-kiosk-0.4.8.apk
+homedash-kiosk-0.4.8.apk.sha256
 ```
 
 L’artifact `homedash-kiosk-debug` du workflow CI reste destiné au développement. Ne l’installez pas sur la tablette murale finale.
@@ -131,13 +131,13 @@ Pour un Pi Zero original, les résultats matériels attendus sont `armv6l` et `3
 
 - `nginx` : `active (running)` ;
 - `homedash` : `active (running)` ;
-- `/opt/homedash/current` pointe vers `/opt/homedash/releases/0.4.7` ;
+- `/opt/homedash/current` pointe vers `/opt/homedash/releases/0.4.8` ;
 - le code serveur et la configuration sont présents ;
 - Node écoute sur `127.0.0.1:4100`.
 
 Si HomeDash est déjà `active (running)`, passez directement à la section 3.4. Sinon, poursuivez avec la réparation ci-dessous.
 
-### 3.3 Installer ou réparer HomeDash 0.4.7 sur le Pi
+### 3.3 Installer ou réparer HomeDash 0.4.8 sur le Pi
 
 **[PI — terminal SSH]** Vérifiez d’abord que le clone existe :
 
@@ -161,12 +161,12 @@ Si le statut est vide, installez exactement la release publiée :
 ```bash
 cd /opt/homedash/repository
 git fetch --tags origin
-git checkout v0.4.7
+git checkout v0.4.8
 
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.7
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.8
 ```
 
-Ce script est réexécutable sur une installation existante. Il vérifie l’architecture, installe le runtime Node ARMv6 si nécessaire, remet en place l’unité `systemd`, Nginx et le certificat, retire l’ancien agent Docker s’il subsiste, installe les protections de stockage, télécharge l’archive native `0.4.7`, puis lance un contrôle de santé. Sur un Zero, l’étape `npm ci` peut durer plusieurs minutes. Ne fermez pas SSH et ne coupez pas l’alimentation.
+Ce script est réexécutable sur une installation existante. Il vérifie l’architecture, installe le runtime Node ARMv6 si nécessaire, remet en place l’unité `systemd`, Nginx et le certificat, retire l’ancien agent Docker s’il subsiste, installe les protections de stockage, télécharge l’archive native `0.4.8`, puis lance un contrôle de santé. Sur un Zero, l’étape `npm ci` peut durer plusieurs minutes. Ne fermez pas SSH et ne coupez pas l’alimentation.
 
 Si le dépôt GitHub est privé, le fichier `/etc/homedash/github-token` doit déjà contenir le token en lecture seule décrit dans la section 7 de [installation-raspberry-pi.md](installation-raspberry-pi.md). Une erreur GitHub `404` pendant l’installation indique généralement que ce token manque, a expiré ou n’a pas `Contents: Read-only` sur ce dépôt.
 
@@ -187,7 +187,7 @@ curl --fail --show-error \
   https://homedash.local/health/ready
 ```
 
-Les deux services doivent répondre `active`, la version doit être `0.4.7`, Node doit être `v22.23.1` avec l’architecture `arm`, et les deux commandes `curl` doivent retourner un JSON contenant :
+Les deux services doivent répondre `active`, la version doit être `0.4.8`, Node doit être `v22.23.1` avec l’architecture `arm`, et les deux commandes `curl` doivent retourner un JSON contenant :
 
 ```json
 { "status": "ready" }
@@ -244,7 +244,7 @@ N’importez jamais `root-ca.key`. Fermez puis rouvrez Chrome ou Edge et saisiss
 https://homedash.local
 ```
 
-Le dashboard doit s’afficher, sans `502` et sans alerte de certificat. Cliquez sur l’engrenage en haut à droite, saisissez le PIN `0000`, puis vérifiez que **Serveur Raspberry Pi** affiche `0.4.7`.
+Le dashboard doit s’afficher, sans `502` et sans alerte de certificat. Cliquez sur l’engrenage en haut à droite, saisissez le PIN `0000`, puis vérifiez que **Serveur Raspberry Pi** affiche `0.4.8`.
 
 À ce stade seulement, le serveur est prêt. Gardez cette page ouverte sur le PC : elle servira à créer le code d’association de la nouvelle APK.
 
@@ -262,7 +262,7 @@ Ne révoquez pas encore l’ancienne tablette depuis le PC : vous la supprimerez
 4. ouvrez **Paramètres > Applications > HomeDash > Désinstaller** ;
 5. redémarrez la tablette et vérifiez que l’écran d’accueil Android normal apparaît.
 
-Si **Désinstaller** reste grisé parce que l’ancienne installation est réellement **Device Owner**, sauvegardez les éléments personnels de la tablette puis effectuez une réinitialisation usine. La réinitialisation de la tablette ne touche pas la base HomeDash du Raspberry Pi. La version `0.4.7` ne réactive ni Device Owner, ni `lock task`.
+Si **Désinstaller** reste grisé parce que l’ancienne installation est réellement **Device Owner**, sauvegardez les éléments personnels de la tablette puis effectuez une réinitialisation usine. La réinitialisation de la tablette ne touche pas la base HomeDash du Raspberry Pi. La version `0.4.8` ne réactive ni Device Owner, ni `lock task`.
 
 ## 4. Installer l’APK sans relier la tablette au PC
 
@@ -272,8 +272,8 @@ Prérequis : la section 3.4 doit être entièrement verte et le dashboard doit �
 
 1. ouvrez Chrome ;
 2. connectez-vous à GitHub si le dépôt est privé ;
-3. ouvrez la Release `v0.4.7` ;
-4. téléchargez `homedash-kiosk-0.4.7.apk` ;
+3. ouvrez la Release `v0.4.8` ;
+4. téléchargez `homedash-kiosk-0.4.8.apk` ;
 5. si Android le demande, autorisez temporairement **Installer des applications inconnues** pour Chrome ou l’application Fichiers ;
 6. ouvrez le téléchargement et choisissez **Installer** ;
 7. après installation, retirez l’autorisation d’installation inconnue à Chrome ;

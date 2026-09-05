@@ -22,6 +22,7 @@ const openMeteoSchema = z.object({
     temperature_2m: z.array(z.number()),
     relative_humidity_2m: z.array(z.number().nullable()),
     weather_code: z.array(z.number()),
+    is_day: z.array(z.number()),
     precipitation_probability: z.array(z.number().nullable()),
   }),
   daily: z.object({
@@ -54,6 +55,7 @@ function mapResponse(location: string, data: z.infer<typeof openMeteoSchema>): W
       temperature: data.hourly.temperature_2m[index] ?? 0,
       humidity: data.hourly.relative_humidity_2m[index] ?? null,
       weatherCode: data.hourly.weather_code[index] ?? 0,
+      isDay: data.hourly.is_day[index] === 1,
       precipitationProbability: data.hourly.precipitation_probability[index] ?? null,
     })),
     daily: data.daily.time.map((date, index) => ({
@@ -73,7 +75,7 @@ export async function getWeather(
   latitude: number,
   longitude: number,
 ): Promise<WeatherData> {
-  const cacheKey = `weather:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+  const cacheKey = `weather:v2:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
   const cached = getCache<WeatherData>(cacheKey);
   if (cached && !cached.expired) return { ...cached.payload, stale: false };
 
@@ -84,7 +86,7 @@ export async function getWeather(
     forecast_days: '7',
     current:
       'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,wind_speed_10m',
-    hourly: 'temperature_2m,relative_humidity_2m,weather_code,precipitation_probability',
+    hourly: 'temperature_2m,relative_humidity_2m,weather_code,is_day,precipitation_probability',
     daily: 'weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max',
   });
   try {
