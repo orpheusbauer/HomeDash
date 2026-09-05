@@ -11,20 +11,20 @@
   },
   "dependencies": {
     "@homedash/contracts": "0.4.8",
-    "@tanstack/react-query": "latest",
-    "date-fns": "latest",
-    "gridstack": "latest",
-    "lucide-react": "latest",
-    "react": "latest",
-    "react-dom": "latest"
+    "@tanstack/react-query": "^5.102.8",
+    "date-fns": "*",
+    "gridstack": "^13.2.0",
+    "lucide-react": "^1.39.0",
+    "react": "*",
+    "react-dom": "*"
   },
   "devDependencies": {
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "@vitejs/plugin-legacy": "latest",
-    "@vitejs/plugin-react": "latest",
+    "@types/react": "*",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-legacy": "*",
+    "@vitejs/plugin-react": "^6.1.1",
     "jsdom": "^30.0.1",
-    "typescript": "latest",
-    "vite": "latest"
+    "typescript": "*",
+    "vite": "^8.2.2"
   }
 }
