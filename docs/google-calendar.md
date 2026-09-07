@@ -103,9 +103,11 @@ Le résultat attendu est `active` et aucun message `CALENDAR_AUTH_FAILED` dans l
 
 Les prochains événements apparaissent dans le widget. Le cache de lecture dure cinq minutes. En cas de coupure Internet, HomeDash peut afficher la dernière copie connue avec l’indication « Données en cache ».
 
-Depuis la version **0.4.6**, l’agenda regroupe les événements des 14 prochains jours par jour de la semaine, avec des repères « Aujourd’hui » et « Demain ». Chaque événement affiche ses horaires de début et de fin et son lieu lorsqu’il est renseigné. Touchez **Description** pour lire les détails. Les événements sur toute la journée ou sur plusieurs jours indiquent leur période ; faites défiler le widget pour voir la suite de l’agenda.
+Depuis la version **0.4.6**, l’agenda regroupe les événements des 14 prochains jours par jour de la semaine, avec des repères « Aujourd’hui » et « Demain ». Chaque événement affiche ses horaires de début et de fin. Les événements sur toute la journée ou sur plusieurs jours indiquent leur période ; faites défiler le widget pour voir la suite de l’agenda.
 
 Depuis **0.4.7**, la présentation est plus compacte : le compteur des événements, les noms/adresses des agendas et les liens pour ouvrir chaque événement dans Google Calendar sont retirés. Les 14 jours restent chargés ; le défilement, les horaires, les lieux, les descriptions et la modification dans HomeDash sont conservés.
+
+Depuis **0.4.9**, le bouton « Description » n’occupe plus de ligne dans la carte. Touchez directement un événement qui possède des informations complémentaires pour déplier son lieu et sa description ; touchez-le une seconde fois pour les replier.
 
 ## 6. Vérifier la lecture et l’écriture
 

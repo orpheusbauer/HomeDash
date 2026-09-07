@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import type { WeatherData } from '@homedash/contracts';
 import { temperatureColor } from './TemperatureTrendChart';
-import { responsiveItemCount, upcomingHours } from './WeatherWidget';
+import { HOURLY_FORECAST_HOURS, responsiveItemCount, upcomingHours } from './WeatherWidget';
 import { WeatherIcon } from './shared';
 import { HOURLY_WIDGET_REFRESH_MS, hourlyWidgetRefresh } from '../widget-refresh';
 
@@ -29,6 +29,20 @@ describe('widget météo', () => {
       '2026-09-03T00:00',
       '2026-09-03T01:00',
     ]);
+  });
+
+  it('conserve au maximum les 24 heures à partir de l’heure courante', () => {
+    const hours = Array.from({ length: 36 }, (_, index) =>
+      hour(
+        `2026-09-${String(2 + Math.floor(index / 24)).padStart(2, '0')}T${String(index % 24).padStart(2, '0')}:00`,
+      ),
+    );
+    const upcoming = upcomingHours(hours, '2026-09-02T08:17');
+
+    expect(HOURLY_FORECAST_HOURS).toBe(24);
+    expect(upcoming).toHaveLength(24);
+    expect(upcoming[0]!.time).toBe('2026-09-02T08:00');
+    expect(upcoming.at(-1)!.time).toBe('2026-09-03T07:00');
   });
 
   it('adapte le nombre de cartes à la largeur disponible', () => {

@@ -1343,9 +1343,19 @@ button {
   display: grid;
   min-height: 0;
   flex: 0 0 auto;
+  grid-auto-flow: column;
   gap: 7px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   padding: 2px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hourly-weather-list::-webkit-scrollbar {
+  display: none;
 }
 
 .hourly-weather-list > div {
@@ -1359,6 +1369,7 @@ button {
   border: 1px solid transparent;
   border-radius: 14px;
   background: var(--surface-soft);
+  scroll-snap-align: start;
 }
 
 .hourly-weather-list > div.is-current {
@@ -1766,21 +1777,42 @@ button {
   display: flex;
   align-items: start;
   gap: 6px;
-  padding: 8px 10px;
   border-left: 3px solid var(--accent);
   border-radius: 0 12px 12px 0;
   background: var(--surface-soft);
+  overflow: hidden;
 }
 
-.calendar-event__content {
+.calendar-event__toggle {
   display: flex;
   min-width: 0;
   flex-direction: column;
   align-items: flex-start;
   flex: 1;
   gap: 3px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   overflow-wrap: anywhere;
+  text-align: left;
   word-break: break-word;
+}
+
+.calendar-event__toggle:disabled {
+  cursor: default;
+}
+
+.calendar-event__toggle:not(:disabled):hover,
+.calendar-event__toggle:not(:disabled):focus-visible {
+  background: rgba(57, 115, 91, 0.06);
+}
+
+.calendar-event__toggle:not(:disabled):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .calendar-event__schedule,
@@ -1815,21 +1847,37 @@ button {
   color: var(--muted);
 }
 
+.calendar-event__details {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 3px;
+  animation: calendar-event-expand 150ms ease-out;
+}
+
 .calendar-event__description {
   width: 100%;
   font-size: 0.8rem;
   line-height: 1.5;
-}
-
-.calendar-event__description summary {
-  padding: 5px 0;
-  color: var(--accent-strong);
-  cursor: pointer;
-}
-
-.calendar-event__description p {
-  margin: 3px 0 0;
   white-space: pre-wrap;
+}
+
+.calendar-event .event-edit {
+  flex: 0 0 auto;
+  margin: 8px 8px 0 0;
+}
+
+@keyframes calendar-event-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .event-edit:hover {

@@ -31,6 +31,7 @@ function localDateTime(value: string): string {
 export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetComponentProps) {
   const client = useQueryClient();
   const [edited, setEdited] = useState<CalendarEvent | 'new' | null>(null);
+  const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
   const calendarIds = Array.isArray(instance.config.calendarIds)
     ? instance.config.calendarIds.filter((id): id is string => typeof id === 'string')
     : ['primary'];
@@ -138,6 +139,7 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
                 </h3>
                 <ol className="event-list">
                   {group.events.map((event) => {
+                    const eventKey = `${event.calendarId}-${event.id}`;
                     const calendar = calendarsQuery.data?.find(
                       (item) =>
                         item.id === event.calendarId ||
@@ -146,33 +148,44 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
                     const description = event.description
                       ? calendarDescriptionText(event.description)
                       : '';
+                    const hasDetails = Boolean(event.location || description);
+                    const expanded = hasDetails && expandedEventKey === eventKey;
                     return (
                       <li
                         className="calendar-event"
-                        key={`${event.calendarId}-${event.id}`}
+                        key={eventKey}
                         style={{ borderLeftColor: calendar?.color ?? 'var(--accent)' }}
                       >
-                        <div className="calendar-event__content">
-                          <div className="calendar-event__schedule">
+                        <button
+                          type="button"
+                          className="calendar-event__toggle"
+                          disabled={!hasDetails}
+                          aria-expanded={hasDetails ? expanded : undefined}
+                          onClick={() =>
+                            setExpandedEventKey((current) =>
+                              current === eventKey ? null : eventKey,
+                            )
+                          }
+                        >
+                          <span className="calendar-event__schedule">
                             <Clock3 size={15} aria-hidden="true" />
                             <span>{calendarEventSchedule(event)}</span>
-                          </div>
+                          </span>
                           <strong className="calendar-event__title">{event.title}</strong>
-                          {event.location && (
-                            <div className="calendar-event__location">
-                              <MapPin size={15} aria-hidden="true" />
-                              <span>{event.location}</span>
-                            </div>
+                          {expanded && (
+                            <span className="calendar-event__details">
+                              {event.location && (
+                                <span className="calendar-event__location">
+                                  <MapPin size={15} aria-hidden="true" />
+                                  <span>{event.location}</span>
+                                </span>
+                              )}
+                              {description && (
+                                <span className="calendar-event__description">{description}</span>
+                              )}
+                            </span>
                           )}
-                          {description && (
-                            <details className="calendar-event__description">
-                              <summary aria-label={`Description de ${event.title}`}>
-                                Description
-                              </summary>
-                              <p>{description}</p>
-                            </details>
-                          )}
-                        </div>
+                        </button>
                         {editing && adminUnlocked && (
                           <button
                             className="event-edit"

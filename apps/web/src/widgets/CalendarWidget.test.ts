@@ -173,12 +173,12 @@ async function render(
 }
 
 describe('présentation de l’agenda', () => {
-  it('affiche les jours, horaires, couleurs et descriptions sans compteur ni liens externes', async () => {
+  it('déplie les détails en touchant la carte, sans bouton Description ni lien externe', async () => {
     await render([event(), event({ id: 'family', calendarId: 'family' })]);
     expect(host.querySelector('h3')!.textContent).toContain('jeudi 3 septembre');
     expect(host.textContent).toContain('Aujourd’hui');
     expect(host.textContent).toContain('10:00 – 11:30');
-    expect(host.textContent).toContain('Salle des associations');
+    expect(host.textContent).not.toContain('Salle des associations');
     expect(host.querySelector('.calendar-toolbar')).toBeNull();
     expect(host.querySelector('.calendar-event__source')).toBeNull();
     expect(host.textContent).not.toContain('Personnel');
@@ -186,14 +186,20 @@ describe('présentation de l’agenda', () => {
     expect(
       host.querySelectorAll<HTMLElement>('.calendar-event')[0]!.style.borderLeftColor,
     ).not.toBe(host.querySelectorAll<HTMLElement>('.calendar-event')[1]!.style.borderLeftColor);
-    const description = host.querySelector('details')!;
-    expect(description.open).toBe(false);
-    await act(async () => description.querySelector('summary')!.click());
-    expect(description.open).toBe(true);
-    expect(description.querySelector('p')!.textContent).toBe(
+    expect(host.textContent).not.toContain('Description');
+    expect(host.textContent).not.toContain('Préparer le programme');
+    const eventToggle = host.querySelector<HTMLButtonElement>('.calendar-event__toggle')!;
+    expect(eventToggle.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => eventToggle.click());
+    expect(eventToggle.getAttribute('aria-expanded')).toBe('true');
+    expect(host.textContent).toContain('Salle des associations');
+    expect(host.querySelector('.calendar-event__description')!.textContent).toBe(
       'Préparer le programme & les activités.\nApporter un carnet.',
     );
-    expect(description.querySelector('b')).toBeNull();
+    expect(host.querySelector('.calendar-event__description b')).toBeNull();
+    await act(async () => eventToggle.click());
+    expect(eventToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(host.textContent).not.toContain('Préparer le programme');
     expect(host.querySelectorAll('.event-open')).toHaveLength(0);
     expect(host.querySelector('.event-edit')).toBeNull();
   });
@@ -218,8 +224,9 @@ describe('présentation de l’agenda', () => {
     });
     expect(host.querySelector('.calendar-event__source')).toBeNull();
     expect(host.textContent).toContain('Données en cache');
-    expect(host.querySelector('details')).toBeNull();
+    expect(host.querySelector('.calendar-event__description')).toBeNull();
     expect(host.querySelector('.calendar-event__location')).toBeNull();
+    expect(host.querySelector<HTMLButtonElement>('.calendar-event__toggle')!.disabled).toBe(true);
   });
 
   it('conserve les états vide et déconnecté', async () => {

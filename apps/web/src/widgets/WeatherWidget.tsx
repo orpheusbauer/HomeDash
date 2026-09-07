@@ -10,6 +10,7 @@ import type { WidgetComponentProps } from './types';
 import { hourlyWidgetRefresh } from '../widget-refresh';
 
 const WEATHER_ITEM_GAP = 7;
+export const HOURLY_FORECAST_HOURS = 24;
 
 export function responsiveItemCount(
   availableWidth: number,
@@ -187,7 +188,9 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
 
 export function upcomingHours(hourly: WeatherData['hourly'], currentTime: string) {
   const currentHour = currentTime.slice(0, 13);
-  return hourly.filter((hour) => hour.time.slice(0, 13) >= currentHour);
+  return hourly
+    .filter((hour) => hour.time.slice(0, 13) >= currentHour)
+    .slice(0, HOURLY_FORECAST_HOURS);
 }
 
 export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
@@ -202,19 +205,22 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
     );
 
   const weather = query.data;
-  const visibleHours = hours.slice(0, visibleHourCount);
+  const initiallyVisibleHours = hours.slice(0, visibleHourCount);
+  const hourlyColumnCount = Math.max(visibleHourCount, 1);
+  const hourlyGapCompensation = ((hourlyColumnCount - 1) * WEATHER_ITEM_GAP) / hourlyColumnCount;
 
   return (
     <div className="hourly-weather-widget">
       <div
         className="hourly-weather-list"
-        aria-label="Prévisions météo heure par heure"
+        aria-label="Prévisions météo heure par heure, faites défiler horizontalement pour voir les heures suivantes"
         ref={hoursRef}
+        tabIndex={hours.length > visibleHourCount ? 0 : undefined}
         style={{
-          gridTemplateColumns: `repeat(${Math.max(visibleHours.length, 1)}, minmax(0, 1fr))`,
+          gridAutoColumns: `calc(${100 / hourlyColumnCount}% - ${hourlyGapCompensation}px)`,
         }}
       >
-        {visibleHours.map((hour, index) => (
+        {hours.map((hour, index) => (
           <div className={index === 0 ? 'is-current' : ''} key={hour.time}>
             <time dateTime={hour.time}>
               {index === 0
@@ -235,7 +241,7 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
       </div>
       <TemperatureTrendChart
         title="Évolution de la température"
-        points={visibleHours.map((hour, index) => ({
+        points={initiallyVisibleHours.map((hour, index) => ({
           key: hour.time,
           label:
             index === 0

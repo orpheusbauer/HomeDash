@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.8` fournit déjà :
+La version `0.4.9` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -31,9 +31,11 @@ La version `0.4.8` fournit déjà :
 - agenda allégé, sans compteur, adresse d’agenda ni lien externe par événement, et localisation/date dans les en-têtes météo (0.4.7) ;
 - récupération des écrans blancs après mise à jour, validation du cache local et résolution des noms `.local` sur Android (0.4.7) ;
 - actualisation horaire des données météo et Google Calendar, maintenue lorsque la WebView est en arrière-plan (0.4.8) ;
-- indicateur jour/nuit fourni par Open-Meteo pour chaque prévision horaire et icône de lune par ciel dégagé nocturne (0.4.8).
+- indicateur jour/nuit fourni par Open-Meteo pour chaque prévision horaire et icône de lune par ciel dégagé nocturne (0.4.8) ;
+- événements Google Calendar compacts dont les détails s’ouvrent en touchant toute la carte, sans bouton « Description » (0.4.9) ;
+- prévisions météo horaires sur 24 heures, défilables horizontalement avec des cartes entières quelle que soit la largeur du widget (0.4.9).
 
-La release **0.4.8** garde les widgets externes à jour et rend les prévisions horaires nocturnes plus cohérentes. Mettre à jour le serveur puis l’APK signée **0.4.8 / versionCode 15**. Les [notes 0.4.8](docs/releases/0.4.8.md) détaillent tous les changements. Si l’installeur du Pi date d’avant **0.4.5**, appliquez une fois l’installeur complet de la release actuelle pour bénéficier du correctif du cache npm. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
+La release **0.4.9** simplifie l’ouverture des détails Calendar et permet de parcourir les 24 prochaines heures de météo sans couper les cartes au bord du widget. Mettre à jour le serveur puis l’APK signée **0.4.9 / versionCode 16**. Les [notes 0.4.9](docs/releases/0.4.9.md) détaillent tous les changements. Si l’installeur du Pi date d’avant **0.4.5**, appliquez une fois l’installeur complet de la release actuelle pour bénéficier du correctif du cache npm. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 
