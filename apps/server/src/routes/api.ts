@@ -136,9 +136,10 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
         location: z.string().trim().min(1).max(120).default('Strasbourg'),
         latitude: z.coerce.number().min(-90).max(90),
         longitude: z.coerce.number().min(-180).max(180),
+        refresh: z.enum(['true', 'false']).default('false'),
       })
       .parse(request.query);
-    return getWeather(query.location, query.latitude, query.longitude);
+    return getWeather(query.location, query.latitude, query.longitude, query.refresh === 'true');
   });
 
   app.get('/api/v1/sensors', async () => listSensors());

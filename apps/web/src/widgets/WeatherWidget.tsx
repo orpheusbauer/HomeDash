@@ -8,6 +8,7 @@ import { WeatherIcon, weatherLabel } from './shared';
 import { TemperatureTrendChart } from './TemperatureTrendChart';
 import type { WidgetComponentProps } from './types';
 import { hourlyWidgetRefresh } from '../widget-refresh';
+import { useCurrentTime, weatherLocalTime } from '../use-current-time';
 
 const WEATHER_ITEM_GAP = 7;
 export const HOURLY_FORECAST_HOURS = 24;
@@ -58,18 +59,21 @@ function useWeather(config: Record<string, unknown>) {
   const params = weatherParams(config);
   return useQuery({
     queryKey: ['weather', params],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api<WeatherData>(
-        `/api/v1/weather?${new URLSearchParams({ ...params, latitude: String(params.latitude), longitude: String(params.longitude) })}`,
+        `/api/v1/weather?${new URLSearchParams({ ...params, latitude: String(params.latitude), longitude: String(params.longitude), refresh: 'true' })}`,
+        { signal, cache: 'no-store' },
       ),
     ...hourlyWidgetRefresh,
+    refetchOnMount: 'always',
   });
 }
 
 export function WeatherHeaderDetails({ instance }: Pick<WidgetComponentProps, 'instance'>) {
   const query = useWeather(instance.config);
   const location = query.data?.location ?? weatherParams(instance.config).location;
-  const day = query.data?.current.time.slice(0, 10);
+  const now = useCurrentTime();
+  const day = query.data ? weatherLocalTime(now, query.data.timezone).slice(0, 10) : null;
   const date =
     instance.widgetId === 'weather.hourly' && day
       ? new Date(`${day}T12:00:00`).toLocaleDateString('fr-FR', {
@@ -143,6 +147,8 @@ export function CurrentWeatherWidget({ instance }: WidgetComponentProps) {
 
 export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
   const query = useWeather(instance.config);
+  const now = useCurrentTime();
+  const today = query.data ? weatherLocalTime(now, query.data.timezone).slice(0, 10) : '';
   const [daysRef, visibleDayCount] = useResponsiveItemCount(query.data?.daily.length ?? 0, 64);
   if (!query.data)
     return (
@@ -151,7 +157,7 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
       </div>
     );
   const weather = query.data;
-  const days = weather.daily.slice(0, visibleDayCount);
+  const days = weather.daily.filter((day) => day.date >= today).slice(0, visibleDayCount);
   return (
     <div className="forecast-widget">
       <div
@@ -195,8 +201,16 @@ export function upcomingHours(hourly: WeatherData['hourly'], currentTime: string
 
 export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
   const query = useWeather(instance.config);
-  const hours = query.data ? upcomingHours(query.data.hourly, query.data.current.time) : [];
+  const now = useCurrentTime();
+  const hours = query.data
+    ? upcomingHours(query.data.hourly, weatherLocalTime(now, query.data.timezone))
+    : [];
   const [hoursRef, visibleHourCount] = useResponsiveItemCount(hours.length, 74);
+  const firstHour = hours[0]?.time;
+  useEffect(() => {
+    // Return to "Maintenant" when waking after scrolling to later forecasts.
+    if (hoursRef.current) hoursRef.current.scrollLeft = 0;
+  }, [firstHour, hoursRef]);
   if (!query.data)
     return (
       <div className="widget-centered">
@@ -253,7 +267,7 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
           temperature: hour.temperature,
         }))}
       />
-      {hours.length === 0 && <p className="form-hint">La journée est terminée.</p>}
+      {hours.length === 0 && <p className="form-hint">Prévisions récentes indisponibles.</p>}
       <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
     </div>
   );

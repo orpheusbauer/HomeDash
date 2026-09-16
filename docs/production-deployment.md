@@ -1,4 +1,4 @@
-# Passage définitif en production — HomeDash 0.4.9
+# Passage définitif en production — HomeDash 0.4.10
 
 Ce document est la procédure courte et ordonnée à suivre maintenant que le Raspberry Pi et la tablette sont physiquement disponibles. Les guides spécialisés donnent les détails et le dépannage : [installation-raspberry-pi.md](installation-raspberry-pi.md), [android-kiosk.md](android-kiosk.md), [updates.md](updates.md), [backup-and-restore.md](backup-and-restore.md) et [crash-loop-recovery.md](crash-loop-recovery.md).
 
@@ -53,20 +53,20 @@ git push origin main
 
 Dans **GitHub > Actions > CI**, attendez que `web-server` et `android` soient verts.
 
-### A3. Créer la Release 0.4.9
+### A3. Créer la Release 0.4.10
 
 ```powershell
-git tag -a v0.4.9 -m "HomeDash 0.4.9 - détails Calendar et météo horaire défilable"
-git push origin v0.4.9
+git tag -a v0.4.10 -m "HomeDash 0.4.10 - actualisation des widgets au réveil"
+git push origin v0.4.10
 ```
 
 Dans **Actions > Release**, attendez le vert. Vérifiez ces quatre fichiers publiés ; GitHub ajoute séparément ses deux archives « Source code » :
 
 ```text
-homedash-native-0.4.9.tar.gz
-homedash-native-0.4.9.tar.gz.sha256
-homedash-kiosk-0.4.9.apk
-homedash-kiosk-0.4.9.apk.sha256
+homedash-native-0.4.10.tar.gz
+homedash-native-0.4.10.tar.gz.sha256
+homedash-kiosk-0.4.10.apk
+homedash-kiosk-0.4.10.apk.sha256
 ```
 
 ## Phase B — mettre le Raspberry Pi en production
@@ -93,18 +93,18 @@ df -h /
 
 Le Zero original doit afficher `armv6l` et `32`. Notez l’adresse affichée par `hostname -I` et réservez-la dans votre routeur.
 
-### B2. Mettre à jour le clone et installer 0.4.9
+### B2. Mettre à jour le clone et installer 0.4.10
 
 ```bash
 cd /opt/homedash/repository
 git status --short
 git fetch --tags origin
-git checkout v0.4.9
+git checkout v0.4.10
 
-sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.9
+sudo bash deployment/raspberry-pi-zero/install-native.sh v0.4.10
 ```
 
-Pour `0.4.9`, une mise à jour applicative ordinaire suffit si l’installeur natif `0.4.5` ou ultérieur est déjà en place. Si l’installeur est plus ancien, appliquez une fois l’installation complète afin de corriger son cache npm. La configuration, la base, les certificats et le token GitHub existants sont conservés.
+Pour `0.4.10`, une mise à jour applicative ordinaire suffit si l’installeur natif `0.4.5` ou ultérieur est déjà en place. Si l’installeur est plus ancien, appliquez une fois l’installation complète afin de corriger son cache npm. La configuration, la base, les certificats et le token GitHub existants sont conservés.
 
 ### B3. Valider le Pi
 
@@ -121,7 +121,7 @@ curl --fail --cacert /var/lib/homedash/tls/root-ca.crt \
 sudo journalctl -u homedash -n 100 --no-pager
 ```
 
-Résultats attendus : version `0.4.9`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
+Résultats attendus : version `0.4.10`, HomeDash et Nginx actifs, timer disque `active (waiting)`, ancien updater inactif ou inconnu, motif de core `/dev/null` et deux réponses HTTP 200.
 
 Un navigateur affichant `502 Bad Gateway nginx` signifie que Nginx est joignable, mais que `curl http://127.0.0.1:4100/health/ready` échoue sur le Pi. Dans ce cas, ne commencez pas la phase tablette : suivez la section 3 de [android-kiosk.md](android-kiosk.md), notamment `systemctl status`, `journalctl` et la relance de l’installeur natif.
 
@@ -133,14 +133,14 @@ Suivez [backup-and-restore.md](backup-and-restore.md), puis copiez l’archive p
 
 ### C1. Retirer une ancienne version debug
 
-Si une ancienne APK debug est installée, désinstallez-la une seule fois avant l’APK signée `0.4.9`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
+Si une ancienne APK debug est installée, désinstallez-la une seule fois avant l’APK signée `0.4.10`. Si l’application était Device Owner et ne peut pas être supprimée, effectuez la transition propre décrite dans [android-kiosk.md](android-kiosk.md).
 
 ### C2. Installer sans câble
 
 Depuis Chrome sur la tablette :
 
-1. ouvrez la Release GitHub `v0.4.9` ;
-2. téléchargez `homedash-kiosk-0.4.9.apk` ;
+1. ouvrez la Release GitHub `v0.4.10` ;
+2. téléchargez `homedash-kiosk-0.4.10.apk` ;
 3. autorisez temporairement l’installation depuis Chrome ;
 4. installez l’APK ;
 5. retirez cette autorisation ;
@@ -241,7 +241,7 @@ curl --fail http://127.0.0.1:4100/health/ready
 
 Le projet peut être considéré comme installé proprement lorsque :
 
-- CI et Release `v0.4.9` sont vertes ;
+- CI et Release `v0.4.10` sont vertes ;
 - Pi et Nginx redémarrent seuls ;
 - la tablette possède l’APK signée ;
 - aucun câble/ADB n’est nécessaire au quotidien ;

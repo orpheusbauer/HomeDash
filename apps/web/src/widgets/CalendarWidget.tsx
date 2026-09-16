@@ -14,6 +14,7 @@ import {
   groupCalendarEvents,
 } from './calendar-display';
 import { hourlyWidgetRefresh } from '../widget-refresh';
+import { useCurrentTime } from '../use-current-time';
 
 interface CalendarInfo {
   id: string;
@@ -30,6 +31,7 @@ function localDateTime(value: string): string {
 
 export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetComponentProps) {
   const client = useQueryClient();
+  const now = useCurrentTime();
   const [edited, setEdited] = useState<CalendarEvent | 'new' | null>(null);
   const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
   const calendarIds = Array.isArray(instance.config.calendarIds)
@@ -110,7 +112,7 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
         <StatusBadge status={statusQuery.isError || eventsQuery.isError ? 'error' : 'loading'} />
       </div>
     );
-  const groups = groupCalendarEvents(eventsQuery.data.events);
+  const groups = groupCalendarEvents(eventsQuery.data.events, now);
   const eventCount = groups.reduce((count, group) => count + group.events.length, 0);
   return (
     <div className="calendar-widget">
@@ -130,11 +132,11 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
       ) : (
         <div className="calendar-days">
           {groups.map((group) => {
-            const relativeDay = calendarRelativeDay(group.date);
+            const relativeDay = calendarRelativeDay(group.date, now);
             return (
               <section className="calendar-day" key={group.key}>
                 <h3 className="calendar-day__heading">
-                  <time dateTime={group.key}>{calendarDayLabel(group.date)}</time>
+                  <time dateTime={group.key}>{calendarDayLabel(group.date, now)}</time>
                   {relativeDay && <span className="calendar-day__relative">{relativeDay}</span>}
                 </h3>
                 <ol className="event-list">

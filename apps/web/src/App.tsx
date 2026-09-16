@@ -30,9 +30,11 @@ import { WidgetSettings } from './components/WidgetSettings';
 import { SettingsCenter } from './components/SettingsCenter';
 import { cachedBootstrap, saveBootstrapCache } from './bootstrap-cache';
 import { HeaderClock } from './components/HeaderClock';
+import { listenForDashboardResume } from './dashboard-refresh';
 
 export function App() {
   const queryClient = useQueryClient();
+  useEffect(() => listenForDashboardResume(queryClient), [queryClient]);
   const bootstrap = useQuery({
     queryKey: ['bootstrap'],
     queryFn: async ({ signal }) => {
@@ -41,6 +43,7 @@ export function App() {
       return data;
     },
     initialData: cachedBootstrap,
+    refetchOnMount: 'always',
     refetchInterval: 60_000,
   });
   const data = bootstrap.data;

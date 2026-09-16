@@ -1,19 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { fr } from 'date-fns/locale';
 import { format } from 'date-fns';
 import type { WidgetComponentProps } from './types';
+import { useCurrentTime } from '../use-current-time';
 
 export function ClockWidget({ instance }: WidgetComponentProps) {
-  const [now, setNow] = useState(new Date());
   const showSeconds = instance.config.showSeconds === true;
+  const now = useCurrentTime(showSeconds ? 1_000 : 10_000);
   const hour12 = instance.config.format === '12h';
   const timezone =
     typeof instance.config.timezone === 'string' ? instance.config.timezone : 'Europe/Paris';
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), showSeconds ? 1000 : 10_000);
-    return () => window.clearInterval(timer);
-  }, [showSeconds]);
 
   const time = useMemo(
     () =>

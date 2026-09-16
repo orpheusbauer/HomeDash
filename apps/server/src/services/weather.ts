@@ -70,15 +70,36 @@ function mapResponse(location: string, data: z.infer<typeof openMeteoSchema>): W
   };
 }
 
+const pendingWeather = new Map<string, Promise<WeatherData>>();
+
 export async function getWeather(
   location: string,
   latitude: number,
   longitude: number,
+  refresh = false,
 ): Promise<WeatherData> {
   const cacheKey = `weather:v2:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+  const pending = pendingWeather.get(cacheKey);
+  if (pending) return { ...(await pending), location };
   const cached = getCache<WeatherData>(cacheKey);
-  if (cached && !cached.expired) return { ...cached.payload, stale: false };
+  if (!refresh && cached && !cached.expired) return { ...cached.payload, location, stale: false };
 
+  const request = fetchWeather(location, latitude, longitude, cacheKey, cached?.payload);
+  pendingWeather.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    pendingWeather.delete(cacheKey);
+  }
+}
+
+async function fetchWeather(
+  location: string,
+  latitude: number,
+  longitude: number,
+  cacheKey: string,
+  cached: WeatherData | undefined,
+): Promise<WeatherData> {
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -100,7 +121,7 @@ export async function getWeather(
     setCache(cacheKey, weather, 15 * 60_000);
     return weather;
   } catch (error) {
-    if (cached) return { ...cached.payload, stale: true };
+    if (cached) return { ...cached, location, stale: true };
     throw new AppError(
       503,
       'WEATHER_UNAVAILABLE',

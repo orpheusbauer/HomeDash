@@ -2,10 +2,13 @@ package io.homedash.kiosk
 
 import android.Manifest
 import android.app.ActivityManager
+import android.app.KeyguardManager
 import android.app.admin.DevicePolicyManager
 import android.content.ComponentName
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -66,6 +69,13 @@ class MainActivity : ComponentActivity() {
     private var androidUpdateRunning = false
     private var exitingToAndroid = false
     private var activityResumed = false
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == Intent.ACTION_SCREEN_ON || intent?.action == Intent.ACTION_USER_PRESENT) {
+                dispatchDashboardResume()
+            }
+        }
+    }
     private val cameraPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
@@ -97,6 +107,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
         applySavedOrientation()
         leaveLegacyKioskMode()
         hideSystemBars()
@@ -115,6 +134,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         activityResumed = true
         exitingToAndroid = false
+        dispatchDashboardResume()
         leaveLegacyKioskMode()
         hideSystemBars()
         if (shouldRunPresenceService()) {
@@ -170,7 +190,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus && !exitingToAndroid) hideSystemBars()
+        if (hasFocus && !exitingToAndroid) {
+            hideSystemBars()
+            dispatchDashboardResume()
+        }
+    }
+
+    private fun dispatchDashboardResume() {
+        if (!activityResumed || exitingToAndroid) return
+        if (!getSystemService(PowerManager::class.java).isInteractive) return
+        if (getSystemService(KeyguardManager::class.java).isKeyguardLocked) return
+        val view = webView ?: return
+        view.post {
+            if (webView === view && activityResumed && !isDestroyed) {
+                view.evaluateJavascript("window.dispatchEvent(new Event('homedash:resume'))", null)
+            }
+        }
     }
 
     private fun hideSystemBars() {
@@ -948,6 +983,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        unregisterReceiver(screenReceiver)
         destroyDashboard()
         super.onDestroy()
     }
