@@ -13,22 +13,22 @@
     "db:seed": "tsx src/db/cli.ts seed"
   },
   "dependencies": {
-    "@fastify/cors": "latest",
-    "@fastify/helmet": "latest",
-    "@fastify/rate-limit": "latest",
-    "@fastify/static": "latest",
-    "@fastify/websocket": "latest",
+    "@fastify/cors": "*",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "*",
+    "@fastify/static": "^10.1.5",
+    "@fastify/websocket": "^11.3.1",
     "@homedash/contracts": "0.4.12",
-    "drizzle-orm": "latest",
-    "fastify": "latest",
-    "pino-pretty": "latest",
-    "ws": "latest",
-    "zod": "latest"
+    "drizzle-orm": "^0.45.3",
+    "fastify": "^5.12.5",
+    "pino-pretty": "*",
+    "ws": "^8.22.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "latest",
-    "@types/ws": "latest",
-    "tsx": "latest",
-    "typescript": "latest"
+    "@types/node": "*",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "*"
   }
 }
