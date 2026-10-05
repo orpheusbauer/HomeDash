@@ -209,17 +209,17 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
           temperature: day.temperatureMax,
         }))}
       />
-      {days.length === 0 && (
-        <p className="form-hint">
-          Prévisions expirées. Dernière météo conservée dans le widget Météo actuelle.
-        </p>
-      )}
       <DataFreshness
         fetchedAt={weather.fetchedAt}
         stale={weather.stale}
         error={query.error}
         interval={WEATHER_REFRESH_MS}
         source="Open-Meteo"
+        {...(days.length === 0
+          ? {
+              detail: 'Prévisions expirées. La dernière météo reste conservée dans Météo actuelle.',
+            }
+          : {})}
       />
     </div>
   );
@@ -300,13 +300,13 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
           temperature: hour.temperature,
         }))}
       />
-      {hours.length === 0 && <p className="form-hint">Prévisions récentes indisponibles.</p>}
       <DataFreshness
         fetchedAt={weather.fetchedAt}
         stale={weather.stale}
         error={query.error}
         interval={WEATHER_REFRESH_MS}
         source="Open-Meteo"
+        {...(hours.length === 0 ? { detail: 'Aucune prévision récente disponible.' } : {})}
       />
     </div>
   );

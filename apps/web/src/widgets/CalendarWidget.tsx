@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarClock, Clock3, Link2Off, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarClock, Clock3, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { CALENDAR_REFRESH_MS, type CalendarData, type CalendarEvent } from '@homedash/contracts';
 import { api } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
@@ -17,7 +17,7 @@ import { calendarWidgetRefresh } from '../widget-refresh';
 import { useCurrentTime } from '../use-current-time';
 import { dashboardRefreshGeneration } from '../dashboard-refresh';
 import { readWidgetCache, saveWidgetCache } from '../widget-cache';
-import { DataFreshness, dataTimestamp } from '../components/DataFreshness';
+import { DataFreshness } from '../components/DataFreshness';
 
 interface CalendarInfo {
   id: string;
@@ -119,11 +119,10 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   });
   if (statusQuery.data && !statusQuery.data.configured) {
     return (
-      <div className="calendar-empty">
-        <Link2Off size={30} />
-        <strong>Google Calendar n’est pas connecté</strong>
-        <span>Suivez le guide dans Paramètres → Intégrations.</span>
-      </div>
+      <StatusBadge
+        status="error"
+        label="Google Calendar n’est pas connecté. Suivez le guide dans Paramètres → Intégrations."
+      />
     );
   }
   if (!eventsQuery.data)
@@ -226,9 +225,6 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
           })}
         </div>
       )}
-      <p className="widget-footnote">
-        Collecté sur le Pi : {dataTimestamp(eventsQuery.data.fetchedAt)}
-      </p>
       <DataFreshness
         fetchedAt={eventsQuery.data.fetchedAt}
         stale={eventsQuery.data.stale}

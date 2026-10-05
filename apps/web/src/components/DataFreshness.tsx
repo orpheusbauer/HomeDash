@@ -1,6 +1,6 @@
 import { ApiError } from '../api';
 import { useCurrentTime } from '../use-current-time';
-import { StatusBadge } from './StatusBadge';
+import { useWidgetNotification } from '../notifications';
 
 export function dataTimestamp(value: string | null): string {
   return value
@@ -19,22 +19,27 @@ export function DataFreshness({
   error,
   interval,
   source,
+  detail,
 }: {
   fetchedAt: string;
   stale: boolean;
   error: Error | null;
   interval: number;
   source: string;
+  detail?: string;
 }) {
   const now = useCurrentTime();
   const outdated = now.getTime() - Date.parse(fetchedAt) >= interval;
-  const status = error ? 'offline' : stale || outdated ? 'stale' : 'ready';
   const cause = error
     ? error instanceof ApiError
       ? 'Récupération impossible'
       : 'Liaison tablette → Pi interrompue'
     : `${source} : actualisation en attente`;
-  return (
-    <StatusBadge status={status} label={`${cause} · données du ${dataTimestamp(fetchedAt)}`} />
+  useWidgetNotification(
+    error || stale || outdated || detail
+      ? `${cause} · données du ${dataTimestamp(fetchedAt)}.${detail ? ` ${detail}` : ''}`
+      : null,
+    error && !(error instanceof ApiError) ? 'offline' : 'warning',
   );
+  return null;
 }

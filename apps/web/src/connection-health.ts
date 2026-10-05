@@ -53,7 +53,7 @@ export function connectionSummary({
     return {
       level: 'warning',
       label: 'Pi connecté · données en attente',
-      message: `Le Pi répond. ${names.charAt(0).toUpperCase() + names.slice(1)} : ${problems.some((item) => item.state === 'unconfigured') ? 'connexion au fournisseur à configurer' : 'collecte en retard ou fournisseur inaccessible'}. Touchez l’état de connexion pour voir les dates et le diagnostic.`,
+      message: `Le Pi répond. ${names.charAt(0).toUpperCase() + names.slice(1)} : ${problems.some((item) => item.state === 'unconfigured') ? 'connexion au fournisseur à configurer' : 'collecte en retard ou fournisseur inaccessible'}. Les dates et le diagnostic des collectes figurent ci-dessous.`,
     };
   }
   if (realtime !== 'online')

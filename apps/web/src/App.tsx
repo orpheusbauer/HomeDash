@@ -17,11 +17,20 @@ import { listenForRealtime, type RealtimeConnection } from './realtime';
 import { useConnectionHealth } from './connection-health';
 import {
   ConnectionBadge,
-  ConnectionBanner,
+  NotificationButton,
   ConnectionDetails,
 } from './components/ConnectionStatus';
+import { NotificationsProvider, useDashboardNotification } from './notifications';
 
 export function App() {
+  return (
+    <NotificationsProvider>
+      <DashboardApp />
+    </NotificationsProvider>
+  );
+}
+
+function DashboardApp() {
   const queryClient = useQueryClient();
   useEffect(() => listenForDashboardResume(queryClient), [queryClient]);
   const bootstrap = useQuery({
@@ -36,6 +45,13 @@ export function App() {
     refetchInterval: 60_000,
   });
   const data = bootstrap.data;
+  useDashboardNotification(
+    'dashboard:bootstrap',
+    'Chargement du dashboard',
+    !data && bootstrap.isError
+      ? 'La disposition du dashboard ne peut pas être récupérée. Nouvelle tentative automatique en cours.'
+      : null,
+  );
   const [activePageId, setActivePageId] = useState(
     () => localStorage.getItem('homedash.activePage') ?? '',
   );
@@ -306,15 +322,22 @@ export function App() {
   if (!data) {
     return (
       <main className="boot-screen">
+        <div className="boot-screen__notifications">
+          <NotificationButton health={health} onClick={() => setShowConnection(true)} />
+          <ConnectionBadge health={health} onClick={() => setShowConnection(true)} />
+        </div>
+        {showConnection && (
+          <ConnectionDetails
+            health={health}
+            realtime={connection}
+            onClose={() => setShowConnection(false)}
+          />
+        )}
         <div className="brand-mark">
           <LayoutDashboard size={34} />
         </div>
         <h1>HomeDash</h1>
-        <p>
-          {bootstrap.isError
-            ? 'Le Raspberry Pi est inaccessible. Nouvelle tentative en cours…'
-            : 'Préparation de votre maison…'}
-        </p>
+        <p>Préparation de votre maison…</p>
       </main>
     );
   }
@@ -344,6 +367,7 @@ export function App() {
         </div>
         <HeaderClock />
         <div className="topbar__actions">
+          <NotificationButton health={health} onClick={() => setShowConnection(true)} />
           <ConnectionBadge health={health} onClick={() => setShowConnection(true)} />
           {editing ? (
             <button
@@ -371,7 +395,6 @@ export function App() {
         </div>
       </header>
 
-      <ConnectionBanner health={health} onClick={() => setShowConnection(true)} />
       {showConnection && (
         <ConnectionDetails
           health={health}

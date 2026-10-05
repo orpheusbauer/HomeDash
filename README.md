@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.11` fournit déjà :
+La version `0.4.12` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -35,9 +35,10 @@ La version `0.4.11` fournit déjà :
 - événements Google Calendar compacts dont les détails s’ouvrent en touchant toute la carte, sans bouton « Description » (0.4.9) ;
 - prévisions météo horaires sur 24 heures, défilables horizontalement avec des cartes entières quelle que soit la largeur du widget (0.4.9) ;
 - actualisation immédiate des widgets au retour à l’application et au réveil Android, récupération de nouvelles données Open-Meteo et recalage des prévisions sur l’heure réelle du lieu (0.4.10) ;
-- collecte autonome sur le Pi, toutes les dix minutes pour la météo et cinq minutes pour Calendar, diagnostic visible de la liaison tablette/Pi et des fournisseurs, reprise des sockets interrompues, cache tablette daté et redémarrage quotidien à 03 h Europe/Paris (0.4.11).
+- collecte autonome sur le Pi, toutes les dix minutes pour la météo et cinq minutes pour Calendar, diagnostic visible de la liaison tablette/Pi et des fournisseurs, reprise des sockets interrompues, cache tablette daté et redémarrage quotidien à 03 h Europe/Paris (0.4.11) ;
+- notifications regroupées dans une cloche en haut à droite, à gauche du bouton réseau : alertes de connexion et dates du cache accessibles sans bannière ni messages dans les widgets (0.4.12).
 
-La release **0.4.11** surveille la liaison tablette/Pi, affiche les dernières collectes et actualise les données même lorsque la tablette dort. Mettre à jour le serveur puis l’APK signée **0.4.11 / versionCode 18**. Sur un Pi existant, activer une fois le timer système de **03 h Europe/Paris** avec la migration décrite dans [le guide des mises à jour](docs/updates.md). Les [notes 0.4.11](docs/releases/0.4.11.md) détaillent tous les changements. Si l’installeur du Pi date d’avant **0.4.5**, utiliser l’installeur complet actuel.
+La release **0.4.12** rassemble les alertes de connexion et de données dans les notifications, accessibles depuis la cloche ou le bouton réseau. Les widgets gardent leur contenu disponible sans afficher ces messages sur le dashboard. Mettre à jour le serveur puis l’APK signée **0.4.12 / versionCode 19**. Les [notes 0.4.12](docs/releases/0.4.12.md) détaillent le patch. Aucune nouvelle migration SSH n’est nécessaire si celle du timer de **03 h Europe/Paris** de 0.4.11 est déjà appliquée ; sinon suivre [le guide des mises à jour](docs/updates.md). Si l’installeur du Pi date d’avant **0.4.5**, utiliser l’installeur complet actuel.
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 

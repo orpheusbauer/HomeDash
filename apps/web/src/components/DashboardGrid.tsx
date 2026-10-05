@@ -5,6 +5,7 @@ import type { LayoutItem, WidgetInstance, WidgetManifest } from '@homedash/contr
 import { WidgetErrorBoundary } from './WidgetErrorBoundary';
 import { WidgetRenderer } from '../widgets/WidgetRenderer';
 import { WeatherHeaderDetails } from '../widgets/WeatherWidget';
+import { WidgetNotificationScope } from '../notifications';
 
 export const GRID_COLUMNS = 48;
 
@@ -223,13 +224,18 @@ export function DashboardGrid({
                 )}
               </header>
               <div className="widget-card__body">
-                <WidgetErrorBoundary>
-                  <WidgetRenderer
-                    instance={instance}
-                    editing={editing}
-                    adminUnlocked={adminUnlocked}
-                  />
-                </WidgetErrorBoundary>
+                <WidgetNotificationScope
+                  id={instance.id}
+                  title={instance.title || manifest?.name || instance.widgetId}
+                >
+                  <WidgetErrorBoundary>
+                    <WidgetRenderer
+                      instance={instance}
+                      editing={editing}
+                      adminUnlocked={adminUnlocked}
+                    />
+                  </WidgetErrorBoundary>
+                </WidgetNotificationScope>
               </div>
             </article>
           </div>

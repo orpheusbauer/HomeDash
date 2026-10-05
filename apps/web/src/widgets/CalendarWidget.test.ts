@@ -233,17 +233,18 @@ describe('présentation de l’agenda', () => {
       stale: true,
     });
     expect(host.querySelector('.calendar-event__source')).toBeNull();
-    expect(host.textContent).toContain('Google Calendar : actualisation en attente');
-    expect(host.textContent).toContain('03/09');
+    expect(host.textContent).not.toContain('Google Calendar : actualisation en attente');
+    expect(host.textContent).not.toContain('Collecté sur le Pi');
+    expect(host.textContent).toContain('Réunion de rentrée');
     expect(host.querySelector('.calendar-event__description')).toBeNull();
     expect(host.querySelector('.calendar-event__location')).toBeNull();
     expect(host.querySelector<HTMLButtonElement>('.calendar-event__toggle')!.disabled).toBe(true);
   });
 
-  it('conserve les états vide et déconnecté', async () => {
+  it('conserve l’état vide et retire le message de déconnexion de la carte', async () => {
     await render([]);
     expect(host.textContent).toContain('Aucun événement à venir');
     await render([], { configured: false });
-    expect(host.textContent).toContain('Google Calendar n’est pas connecté');
+    expect(host.textContent).not.toContain('Google Calendar n’est pas connecté');
   });
 });

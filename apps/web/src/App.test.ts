@@ -113,6 +113,21 @@ afterEach(async () => {
 });
 
 describe('enregistrement par Terminer', () => {
+  it('ouvre le diagnostic du Pi depuis la cloche sans afficher de bannière sur le dashboard', async () => {
+    request.mockImplementation(async (path) => {
+      if (path === '/api/v1/connection') throw new Error('network');
+      return seed;
+    });
+    await act(async () => client.refetchQueries({ queryKey: ['connection-health'] }));
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(host.querySelector('.connection-banner')).toBeNull();
+    expect(host.textContent).not.toContain('Pi inaccessible');
+    const notifications = host.querySelector<HTMLButtonElement>('.notification-button')!;
+    expect(notifications.nextElementSibling?.classList.contains('connection-button')).toBe(true);
+    await act(async () => notifications.click());
+    expect(host.querySelector('[role="dialog"]')!.textContent).toContain('Pi inaccessible');
+  });
+
   it('regroupe les gestes rapides et attend la réponse avant de quitter l’édition', async () => {
     await act(async () => {
       gridProps.onLayoutChange([edited[0]!]);

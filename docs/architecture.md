@@ -77,6 +77,8 @@ Le serveur Fastify n’écoute jamais directement sur toutes les interfaces.
 
 Depuis 0.4.11, un collecteur serveur parcourt toutes les pages au démarrage puis vérifie les échéances toutes les trente secondes : météo dix minutes, Calendar cinq minutes, nouvelles tentatives après une minute en cas de panne. Les demandes identiques sont partagées et le cycle de fond est séquentiel. L’API `/api/v1/connection` expose les dernières collectes/tentatives et l’état du timer, sans appeler les fournisseurs. La tablette sonde l’API toutes les trente secondes et au réveil ; le WebSocket émet un heartbeat toutes les vingt secondes.
 
+Depuis 0.4.12, les alertes sont regroupées dans la cloche de la barre supérieure. Un registre React reçoit les états des widgets affichés avec leur nom et leur date de collecte ; il retire une alerte après récupération ou démontage du widget. Les interruptions générales et le diagnostic serveur restent accessibles dans la même fenêtre. Les widgets conservent leur contenu disponible sans rendre de badge d’erreur ou de cache ; aucune bannière n’est ajoutée au dashboard.
+
 Le navigateur conserve un maximum de 32 ensembles météo/agendas validés dans son stockage local, en plus du bootstrap. Les valeurs restaurées sont marquées périmées et conservent leur date de récupération ; les erreurs de liaison s’affichent indépendamment de la santé des fournisseurs.
 
 SQLite contient pages, instances de widgets, historiques de layout, notes, capteurs, cache externe, paramètres et tablettes. WAL, clés étrangères et délai d’attente sont activés. Les écritures de layout et notes utilisent une révision optimiste.
@@ -100,8 +102,8 @@ Les mises à jour arrêtent le processus avant la sauvegarde afin de produire un
 /opt/homedash/releases/0.4.1
 /opt/homedash/releases/0.4.5
 /opt/homedash/releases/0.4.7
-/opt/homedash/releases/0.4.11
-/opt/homedash/current -> /opt/homedash/releases/0.4.11
+/opt/homedash/releases/0.4.12
+/opt/homedash/current -> /opt/homedash/releases/0.4.12
 ```
 
 L’updater natif télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.

@@ -1,48 +1,64 @@
-import { CloudOff, RefreshCw, TriangleAlert, Wifi } from 'lucide-react';
+import { Bell, Check, CloudOff, RefreshCw, Wifi } from 'lucide-react';
 import { Modal } from './Modal';
 import { dataTimestamp } from './DataFreshness';
 import type { useConnectionHealth } from '../connection-health';
 import type { RealtimeConnection } from '../realtime';
+import { useWidgetNotifications } from '../notifications';
 
-type Health = ReturnType<typeof useConnectionHealth>;
+type Health = Pick<
+  ReturnType<typeof useConnectionHealth>,
+  'summary' | 'data' | 'dataUpdatedAt' | 'isError' | 'isFetching' | 'refetch'
+>;
 
 export function ConnectionBadge({ health, onClick }: { health: Health; onClick: () => void }) {
   const { level, label } = health.summary;
   return (
     <button
       type="button"
-      className={`connection-pill connection-pill--${level}`}
+      className={`icon-button connection-button connection-button--${level}`}
       aria-label="État de connexion et des données"
+      aria-haspopup="dialog"
       title={label}
       onClick={onClick}
     >
-      {level === 'online' ? (
-        <Wifi size={16} />
-      ) : level === 'warning' ? (
-        <TriangleAlert size={16} />
+      {level === 'connecting' ? (
+        <RefreshCw size={18} aria-hidden="true" />
+      ) : level === 'offline' ? (
+        <CloudOff size={18} aria-hidden="true" />
       ) : (
-        <CloudOff size={16} />
+        <Wifi size={18} aria-hidden="true" />
       )}
-      <span>{label}</span>
     </button>
   );
 }
 
-export function ConnectionBanner({ health, onClick }: { health: Health; onClick: () => void }) {
+export function NotificationButton({ health, onClick }: { health: Health; onClick: () => void }) {
+  const notifications = useWidgetNotifications();
   const { message, level } = health.summary;
-  if (!message) return null;
+  const count = notifications.length + (message ? 1 : 0);
+  const severity =
+    level === 'offline' || notifications.some((item) => item.level === 'offline')
+      ? 'offline'
+      : count
+        ? 'warning'
+        : 'ready';
+  const label = count ? `Notifications : ${count} alerte${count > 1 ? 's' : ''}` : 'Notifications';
   return (
-    <div
-      className={`connection-banner connection-banner--${level}`}
-      role="status"
-      aria-live="polite"
+    <button
+      type="button"
+      className={`icon-button notification-button notification-button--${severity}`}
+      onClick={onClick}
+      aria-label={label}
+      aria-haspopup="dialog"
+      title={label}
     >
-      <TriangleAlert size={18} aria-hidden="true" />
-      <button type="button" onClick={onClick}>
-        <strong>{health.summary.label}</strong>
-        <span>{message}</span>
-      </button>
-    </div>
+      <Bell size={19} aria-hidden="true" />
+      {count > 0 && (
+        <span className="notification-button__count" aria-hidden="true">
+          {count > 9 ? '9+' : count}
+        </span>
+      )}
+    </button>
   );
 }
 
@@ -55,13 +71,22 @@ export function ConnectionDetails({
   realtime: RealtimeConnection;
   onClose: () => void;
 }) {
+  const notifications = useWidgetNotifications();
   return (
     <Modal
-      title="Connexion et fraîcheur des données"
+      title="Notifications"
       onClose={onClose}
-      description="État observé depuis cette tablette et dernières collectes du Raspberry Pi."
+      description="Connexion de la tablette, état du Raspberry Pi et dernières données conservées."
     >
       <div className="form-stack connection-details">
+        {!health.summary.message &&
+          notifications.length === 0 &&
+          health.summary.level === 'online' && (
+            <p className="notification-empty">
+              <Check size={18} aria-hidden="true" />
+              Aucune alerte en cours.
+            </p>
+          )}
         <div>
           <strong>{health.summary.label}</strong>
           <p>
@@ -71,6 +96,19 @@ export function ConnectionDetails({
                 : 'La tablette échange normalement avec le Raspberry Pi.')}
           </p>
         </div>
+        {notifications.length > 0 && (
+          <div className="notification-list" aria-label="Alertes des widgets">
+            {notifications.map((item) => (
+              <article
+                className={`notification-item notification-item--${item.level}`}
+                key={item.id}
+              >
+                <strong>{item.title}</strong>
+                <p>{item.message}</p>
+              </article>
+            ))}
+          </div>
+        )}
         <div className="settings-list">
           <div>
             <span>Dernière réponse du Pi</span>
@@ -123,7 +161,7 @@ export function ConnectionDetails({
           <p className="form-hint">
             {health.data.nightlyReboot.active
               ? 'Redémarrage quotidien du Pi activé à 03:00 (Europe/Paris).'
-              : 'Redémarrage quotidien à installer ou à activer sur le Pi : voir le guide de mise à jour 0.4.11.'}
+              : 'Redémarrage quotidien à installer ou à activer sur le Pi : voir le guide de mise à jour.'}
           </p>
         )}
         <button

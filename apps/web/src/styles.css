@@ -281,73 +281,82 @@ button {
   color: var(--danger);
 }
 
-.connection-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 34px;
-  padding: 6px 11px;
-  border-radius: 999px;
+.connection-button {
   color: var(--muted);
-  background: var(--surface-soft);
-  font-size: 0.78rem;
-  font-weight: 700;
 }
 
-.connection-pill--online {
+.connection-button--online {
   color: var(--accent-strong);
-  background: var(--accent-soft);
 }
 
-.connection-pill--offline {
+.connection-button--offline,
+.notification-button--offline {
   color: var(--danger);
-  background: #f8e8e6;
 }
 
-.connection-pill--warning {
+.connection-button--warning,
+.notification-button--warning {
   color: #805518;
-  background: #fff2d8;
 }
 
-button.connection-pill {
-  border: 1px solid transparent;
-  cursor: pointer;
-  min-height: 38px;
-  white-space: nowrap;
+.notification-button {
+  position: relative;
 }
 
-.connection-banner {
+.notification-button__count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 4px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  color: #fff;
+  background: #805518;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 15px;
+}
+
+.notification-button--offline .notification-button__count {
+  background: var(--danger);
+}
+
+.notification-empty {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px clamp(16px, 3vw, 44px);
-  color: #805518;
-  background: #fff2d8;
-  border-bottom: 1px solid #ead9b6;
+  gap: 8px;
+  color: var(--accent-strong);
 }
 
-.connection-banner--offline {
-  color: #923d36;
-  background: #fce9e7;
+.notification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-item {
+  padding: 14px 16px;
+  border: 1px solid #ead9b6;
+  border-radius: 14px;
+  background: #fff8eb;
+}
+
+.notification-item--offline {
   border-color: #efd0cc;
+  background: #fdf4f2;
 }
 
-.connection-banner > svg {
-  flex-shrink: 0;
-}
-
-.connection-banner button {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
+.notification-item p {
   font-size: 13px;
-  line-height: 1.5;
+}
+
+.boot-screen__notifications {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  gap: 8px;
 }
 
 .connection-details p {
@@ -1067,17 +1076,6 @@ button.connection-pill {
   background: var(--surface-soft);
   font-size: 0.7rem;
   font-weight: 700;
-}
-
-.status-badge--stale,
-.status-badge--offline {
-  color: var(--warning);
-  background: #faf1df;
-}
-
-.status-badge--error {
-  color: var(--danger);
-  background: #f8e8e6;
 }
 
 .widget-centered {
@@ -1987,8 +1985,7 @@ button.connection-pill {
 }
 
 @media (max-width: 1100px) {
-  .brand strong,
-  .connection-pill span {
+  .brand strong {
     display: none;
   }
 
