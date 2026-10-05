@@ -36,6 +36,19 @@ readonly ARCHIVE_NAME="homedash-native-${VERSION_VALUE}.tar.gz"
 readonly CHECKSUM_NAME="${ARCHIVE_NAME}.sha256"
 readonly RELEASE_DIRECTORY="${RELEASES_DIRECTORY}/${VERSION_VALUE}"
 
+exec 9>/run/homedash-maintenance.lock
+if ! flock --nonblock 9; then
+  echo "Une maintenance HomeDash est déjà en cours; mise à jour annulée." >&2
+  exit 1
+fi
+
+install_release_reliability() {
+  local installer="${RELEASE_DIRECTORY}/deployment/raspberry-pi-zero/install-reliability.sh"
+  if [[ -f "${installer}" ]]; then
+    bash "${installer}" --from-update
+  fi
+}
+
 if [[ ! -x /usr/local/bin/node || ! -x /usr/local/bin/npm ]]; then
   echo "Node.js ARMv6 n'est pas installé. Lancez install-node-armv6.sh." >&2
   exit 1
@@ -147,6 +160,7 @@ if [[ -L "${CURRENT_LINK}" ]]; then
   previous_release="$(readlink -f "${CURRENT_LINK}")"
 fi
 if [[ "${previous_release}" == "${RELEASE_DIRECTORY}" ]]; then
+  install_release_reliability
   systemctl reset-failed homedash.service 2>/dev/null || true
   systemctl restart homedash.service
   echo "HomeDash ${VERSION_VALUE} était déjà actif; service redémarré."
@@ -194,4 +208,6 @@ fi
 printf '%s\n' "${VERSION_VALUE}" > /var/lib/homedash/installed-version
 chown root:homedash /var/lib/homedash/installed-version
 chmod 0644 /var/lib/homedash/installed-version
+
+install_release_reliability
 echo "HomeDash ${VERSION_VALUE} est actif. Sauvegarde préalable: ${backup_file}"

@@ -26,13 +26,20 @@ const forecast = {
   },
 };
 const fetchMock = vi.fn();
+let testTime = Date.now();
 
 beforeEach(() => {
   vi.resetAllMocks();
+  testTime += 3_600_000;
+  vi.useFakeTimers();
+  vi.setSystemTime(testTime);
   vi.stubGlobal('fetch', fetchMock);
   fetchMock.mockImplementation(async () => new Response(JSON.stringify(forecast)));
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 async function primeCache() {
   const payload = await getWeather('Paris', 48.8566, 2.3522);
@@ -55,7 +62,7 @@ describe('actualisation météo au réveil', () => {
     expect(fresh.current.temperature).toBe(25);
     expect(fresh.stale).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(setCache).toHaveBeenLastCalledWith(expect.any(String), fresh, 15 * 60_000);
+    expect(setCache).toHaveBeenLastCalledWith(expect.any(String), fresh, 10 * 60_000);
   });
 
   it('partage la requête entre widgets de même position et préserve leurs libellés', async () => {
@@ -75,6 +82,9 @@ describe('actualisation météo au réveil', () => {
     const cached = await primeCache();
     fetchMock.mockRejectedValueOnce(new Error('offline'));
     expect(await getWeather('Paris', 48.8566, 2.3522, true)).toEqual({ ...cached, stale: true });
+    expect((await getWeather('Paris', 48.8566, 2.3522)).stale).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect((await getWeather('Paris', 48.8566, 2.3522, true)).stale).toBe(false);
   });
 
@@ -83,6 +93,7 @@ describe('actualisation météo au réveil', () => {
     await expect(getWeather('Paris', 48.8566, 2.3522, true)).rejects.toMatchObject({
       code: 'WEATHER_UNAVAILABLE',
     });
+    await vi.advanceTimersByTimeAsync(60_000);
     expect((await getWeather('Paris', 48.8566, 2.3522, true)).stale).toBe(false);
   });
 });

@@ -57,7 +57,7 @@ if systemctl cat homedash-updater.service >/dev/null 2>&1 \
 fi
 
 apt-get update
-apt-get install -y ca-certificates curl file git jq nginx openssl procps xz-utils
+apt-get install -y ca-certificates curl file git jq nginx openssl procps util-linux xz-utils
 
 bash "${DEPLOYMENT_DIRECTORY}/install-node-armv6.sh"
 
@@ -158,6 +158,7 @@ systemctl start homedash-disk-guard.service
 systemctl start homedash-disk-guard.timer
 systemctl restart homedash-native-updater.service
 systemctl restart nginx.service
+bash "${DEPLOYMENT_DIRECTORY}/install-reliability.sh"
 /usr/local/sbin/homedash-update-native "${TAG}"
 
 echo

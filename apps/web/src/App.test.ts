@@ -85,7 +85,16 @@ beforeEach(async () => {
   localStorage.setItem('homedash.bootstrap', JSON.stringify(seed));
   request.mockReset();
   request.mockImplementation(async (path) =>
-    path === '/api/v1/bootstrap' ? seed : { revision: 4 },
+    path === '/api/v1/bootstrap'
+      ? seed
+      : path === '/api/v1/connection'
+        ? {
+            serverTime: stamp,
+            version: seed.version,
+            integrations: [],
+            nightlyReboot: { active: false, time: '03:00', timezone: 'Europe/Paris' },
+          }
+        : { revision: 4 },
   );
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   host = document.createElement('div');

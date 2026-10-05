@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CalendarEvent, WidgetInstance } from '@homedash/contracts';
 import { CalendarWidget } from './CalendarWidget';
+import { api } from '../api';
 import {
   calendarDate,
   calendarDayKey,
@@ -128,7 +129,7 @@ async function render(
   events: CalendarEvent[],
   { editing = false, configured = true, metadata = true, stale = false } = {},
 ) {
-  const calendarIds = ['primary', 'family'];
+  const calendarIds = ['family', 'primary'];
   client.setQueryData(['calendar-status'], { configured });
   client.setQueryData(
     ['calendar-list'],
@@ -144,6 +145,15 @@ async function render(
     stale,
     fetchedAt: now.toISOString(),
   });
+  vi.mocked(api).mockImplementation(async (path) =>
+    client.getQueryData(
+      path.includes('/calendar/status')
+        ? ['calendar-status']
+        : path.includes('/calendar/calendars')
+          ? ['calendar-list']
+          : ['calendar-events', calendarIds],
+    ),
+  );
   await act(async () =>
     root.render(
       createElement(
@@ -223,7 +233,8 @@ describe('présentation de l’agenda', () => {
       stale: true,
     });
     expect(host.querySelector('.calendar-event__source')).toBeNull();
-    expect(host.textContent).toContain('Données en cache');
+    expect(host.textContent).toContain('Google Calendar : actualisation en attente');
+    expect(host.textContent).toContain('03/09');
     expect(host.querySelector('.calendar-event__description')).toBeNull();
     expect(host.querySelector('.calendar-event__location')).toBeNull();
     expect(host.querySelector<HTMLButtonElement>('.calendar-event__toggle')!.disabled).toBe(true);

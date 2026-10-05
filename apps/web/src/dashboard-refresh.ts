@@ -1,6 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 export const DASHBOARD_REFRESH_EVENT = 'homedash:refresh';
+let generation = 0;
+
+export function dashboardRefreshGeneration(): number {
+  return generation;
+}
 
 /** One refresh for the group of browser/native events emitted by a single wake. */
 export function listenForDashboardResume(client: QueryClient) {
@@ -12,6 +17,7 @@ export function listenForDashboardResume(client: QueryClient) {
     const now = Date.now();
     if (event.type !== 'online' && now - lastRefresh < 1_000) return;
     lastRefresh = now;
+    generation += 1;
     // Inactive pages become stale too, and load fresh data when selected.
     // Share requests already running instead of cancelling them on every signal.
     void client.invalidateQueries({}, { cancelRefetch: false });

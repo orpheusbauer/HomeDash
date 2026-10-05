@@ -191,6 +191,36 @@ export const calendarEventSchema = z.object({
 });
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 
+export const WEATHER_REFRESH_MS = 10 * 60_000;
+export const CALENDAR_REFRESH_MS = 5 * 60_000;
+
+export const calendarDataSchema = z.object({
+  events: z.array(calendarEventSchema),
+  stale: z.boolean(),
+  fetchedAt: z.string().datetime(),
+});
+export type CalendarData = z.infer<typeof calendarDataSchema>;
+
+export const integrationHealthSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['weather', 'calendar']),
+  label: z.string(),
+  state: z.enum(['ready', 'stale', 'error', 'pending', 'unconfigured']),
+  fetchedAt: z.string().datetime().nullable(),
+  lastAttemptAt: z.string().datetime().nullable(),
+  lastError: z.string().nullable(),
+  refreshIntervalMs: z.number().positive(),
+});
+export type IntegrationHealth = z.infer<typeof integrationHealthSchema>;
+
+export const connectionHealthSchema = z.object({
+  serverTime: z.string().datetime(),
+  version: z.string(),
+  integrations: z.array(integrationHealthSchema),
+  nightlyReboot: z.object({ active: z.boolean(), time: z.string(), timezone: z.string() }),
+});
+export type ConnectionHealth = z.infer<typeof connectionHealthSchema>;
+
 export const tabletTelemetrySchema = z.object({
   batteryPercent: z.number().min(0).max(100).nullable().optional(),
   charging: z.boolean().optional(),
@@ -217,6 +247,11 @@ export const realtimeMessageSchema = z.discriminatedUnion('type', [
     payload: z.object({ pageId: z.string().uuid() }),
   }),
   z.object({ type: z.literal('server.hello'), payload: z.object({ version: z.string() }) }),
+  z.object({ type: z.literal('server.heartbeat'), payload: z.object({ serverTime: z.string() }) }),
+  z.object({
+    type: z.literal('integration.updated'),
+    payload: z.object({ kind: z.enum(['weather', 'calendar']) }),
+  }),
 ]);
 export type RealtimeMessage = z.infer<typeof realtimeMessageSchema>;
 

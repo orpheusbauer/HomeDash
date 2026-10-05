@@ -8,6 +8,10 @@ for script in \
   update-native.sh \
   install-node-armv6.sh \
   diagnose-crash-loop.sh \
+  diagnose-pi-offline.sh \
+  install-reliability.sh \
+  homedash-nightly-reboot \
+  test-nightly-reboot.sh \
   homedash-disk-guard; do
   bash -n "${SCRIPT_DIRECTORY}/${script}"
 done
@@ -23,6 +27,13 @@ grep -Fxq 'ProtectHome=true' "${SCRIPT_DIRECTORY}/homedash-native-updater.servic
 grep -Fxq 'PrivateTmp=true' "${SCRIPT_DIRECTORY}/homedash-native-updater.service"
 bash "${SCRIPT_DIRECTORY}/test-native-update-cache.sh"
 grep -Fxq 'kernel.core_pattern=/dev/null' "${SCRIPT_DIRECTORY}/60-homedash-core-dumps.conf"
+grep -Fxq 'OnCalendar=*-*-* 03:00:00 Europe/Paris' "${SCRIPT_DIRECTORY}/homedash-nightly-reboot.timer"
+grep -Fxq 'Persistent=false' "${SCRIPT_DIRECTORY}/homedash-nightly-reboot.timer"
+if command -v systemd-analyze >/dev/null 2>&1; then
+  systemd-analyze calendar '*-*-* 03:00:00 Europe/Paris' >/dev/null
+fi
+grep -Fxq 'Storage=persistent' "${SCRIPT_DIRECTORY}/60-homedash-journal.conf"
+bash "${SCRIPT_DIRECTORY}/test-nightly-reboot.sh"
 
 temporary_directory="$(mktemp -d)"
 trap 'rm -rf -- "${temporary_directory}"' EXIT

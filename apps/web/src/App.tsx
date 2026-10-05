@@ -1,26 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  CloudOff,
-  LayoutDashboard,
-  Lock,
-  Menu,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Settings,
-  Wifi,
-} from 'lucide-react';
-import type {
-  BootstrapData,
-  DashboardPage,
-  LayoutItem,
-  RealtimeMessage,
-  Sensor,
-  SystemMetrics,
-  WidgetInstance,
-} from '@homedash/contracts';
-import { api, ApiError, hasAdminSession, realtimeUrl } from './api';
+import { LayoutDashboard, Lock, Menu, Pencil, Plus, RotateCcw, Settings } from 'lucide-react';
+import type { BootstrapData, DashboardPage, LayoutItem, WidgetInstance } from '@homedash/contracts';
+import { api, ApiError, hasAdminSession } from './api';
 import { AdminDialog } from './components/AdminDialog';
 import { DashboardGrid } from './components/DashboardGrid';
 import { Modal } from './components/Modal';
@@ -31,6 +13,13 @@ import { SettingsCenter } from './components/SettingsCenter';
 import { cachedBootstrap, saveBootstrapCache } from './bootstrap-cache';
 import { HeaderClock } from './components/HeaderClock';
 import { listenForDashboardResume } from './dashboard-refresh';
+import { listenForRealtime, type RealtimeConnection } from './realtime';
+import { useConnectionHealth } from './connection-health';
+import {
+  ConnectionBadge,
+  ConnectionBanner,
+  ConnectionDetails,
+} from './components/ConnectionStatus';
 
 export function App() {
   const queryClient = useQueryClient();
@@ -58,7 +47,9 @@ export function App() {
   const [showPages, setShowPages] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [configuredWidget, setConfiguredWidget] = useState<WidgetInstance | null>(null);
-  const [connection, setConnection] = useState<'online' | 'offline' | 'connecting'>('connecting');
+  const [connection, setConnection] = useState<RealtimeConnection>('connecting');
+  const health = useConnectionHealth(connection);
+  const [showConnection, setShowConnection] = useState(false);
   const [toast, setToast] = useState('');
   const revisionRef = useRef<Record<string, number>>({});
   const editingRevisionRef = useRef(0);
@@ -84,42 +75,7 @@ export function App() {
     localStorage.setItem('homedash.activePage', activePageId);
   }, [activePageId]);
 
-  useEffect(() => {
-    let socket: WebSocket | undefined;
-    let retryTimer: number | undefined;
-    let disposed = false;
-    const connect = () => {
-      setConnection('connecting');
-      socket = new WebSocket(realtimeUrl());
-      socket.addEventListener('open', () => setConnection('online'));
-      socket.addEventListener('message', (event) => {
-        try {
-          const message = JSON.parse(String(event.data)) as RealtimeMessage;
-          if (message.type === 'sensor.updated') {
-            queryClient.setQueryData<Sensor>(['sensor', message.payload.id], message.payload);
-            void queryClient.invalidateQueries({ queryKey: ['sensors'] });
-          }
-          if (message.type === 'system.updated')
-            queryClient.setQueryData<SystemMetrics>(['system'], message.payload);
-          if (message.type === 'dashboard.changed')
-            void queryClient.invalidateQueries({ queryKey: ['bootstrap'] });
-        } catch {
-          // Ignore messages from an incompatible future server.
-        }
-      });
-      socket.addEventListener('close', () => {
-        setConnection('offline');
-        if (!disposed) retryTimer = window.setTimeout(connect, 3000);
-      });
-      socket.addEventListener('error', () => socket?.close());
-    };
-    connect();
-    return () => {
-      disposed = true;
-      if (retryTimer) window.clearTimeout(retryTimer);
-      socket?.close();
-    };
-  }, [queryClient]);
+  useEffect(() => listenForRealtime(queryClient, setConnection), [queryClient]);
 
   useEffect(() => {
     if (!toast) return;
@@ -388,19 +344,7 @@ export function App() {
         </div>
         <HeaderClock />
         <div className="topbar__actions">
-          <span
-            className={`connection-pill connection-pill--${connection}`}
-            title="État de la connexion au Raspberry Pi"
-          >
-            {connection === 'online' ? <Wifi size={16} /> : <CloudOff size={16} />}
-            <span>
-              {connection === 'online'
-                ? 'Local'
-                : connection === 'connecting'
-                  ? 'Connexion'
-                  : 'Hors ligne'}
-            </span>
-          </span>
+          <ConnectionBadge health={health} onClick={() => setShowConnection(true)} />
           {editing ? (
             <button
               className="button button--primary"
@@ -426,6 +370,15 @@ export function App() {
           </button>
         </div>
       </header>
+
+      <ConnectionBanner health={health} onClick={() => setShowConnection(true)} />
+      {showConnection && (
+        <ConnectionDetails
+          health={health}
+          realtime={connection}
+          onClose={() => setShowConnection(false)}
+        />
+      )}
 
       {editing && (
         <div className="dashboard-editbar">
@@ -511,8 +464,10 @@ export function App() {
             </div>
             <div>
               <span>Serveur</span>
-              <strong className={connection === 'online' ? 'text-success' : 'text-danger'}>
-                {connection === 'online' ? 'Connecté' : 'Déconnecté'}
+              <strong
+                className={health.summary.level === 'online' ? 'text-success' : 'text-danger'}
+              >
+                {health.summary.label}
               </strong>
             </div>
           </div>

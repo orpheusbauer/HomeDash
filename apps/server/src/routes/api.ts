@@ -34,6 +34,8 @@ import {
 } from '../services/calendar.js';
 import { readNetworkMetrics, readSystemMetrics } from '../services/system.js';
 import { getWeather } from '../services/weather.js';
+import { readIntegrationHealth } from '../services/integration-refresh.js';
+import { nightlyRebootStatus } from '../services/nightly-reboot.js';
 import { createBackup, listBackups } from '../services/backup.js';
 import {
   checkForUpdates,
@@ -70,6 +72,15 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
   }));
 
   app.get('/api/v1/bootstrap', async () => getBootstrap());
+  app.get('/api/v1/connection', async (_request, reply) => {
+    reply.header('Cache-Control', 'no-store');
+    return {
+      serverTime: new Date().toISOString(),
+      version: config.version,
+      integrations: readIntegrationHealth(),
+      nightlyReboot: await nightlyRebootStatus(),
+    };
+  });
 
   app.post('/api/v1/pages', { preHandler: requireAdmin }, async (request, reply) => {
     const body = pageBody.parse(request.body);
@@ -175,9 +186,14 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
       .object({
         calendarIds: z.string().default('primary'),
         days: z.coerce.number().int().min(1).max(90).default(14),
+        refresh: z.enum(['true', 'false']).default('false'),
       })
       .parse(request.query);
-    return listEvents(query.calendarIds.split(',').filter(Boolean), query.days);
+    return listEvents(
+      query.calendarIds.split(',').filter(Boolean),
+      query.days,
+      query.refresh === 'true',
+    );
   });
   app.post('/api/v1/calendar/events', { preHandler: requireAdmin }, async (request, reply) => {
     const body = z

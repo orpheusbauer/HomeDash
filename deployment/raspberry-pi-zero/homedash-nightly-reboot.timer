@@ -1,0 +1,12 @@
+[Unit]
+Description=HomeDash daily Raspberry Pi reboot at 03:00 Europe/Paris
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 Europe/Paris
+AccuracySec=1s
+RandomizedDelaySec=0
+Persistent=false
+Unit=homedash-nightly-reboot.service
+
+[Install]
+WantedBy=timers.target

@@ -304,6 +304,78 @@ button {
   background: #f8e8e6;
 }
 
+.connection-pill--warning {
+  color: #805518;
+  background: #fff2d8;
+}
+
+button.connection-pill {
+  border: 1px solid transparent;
+  cursor: pointer;
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.connection-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px clamp(16px, 3vw, 44px);
+  color: #805518;
+  background: #fff2d8;
+  border-bottom: 1px solid #ead9b6;
+}
+
+.connection-banner--offline {
+  color: #923d36;
+  background: #fce9e7;
+  border-color: #efd0cc;
+}
+
+.connection-banner > svg {
+  flex-shrink: 0;
+}
+
+.connection-banner button {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.connection-details p {
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+
+.integration-health {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.integration-health--stale,
+.integration-health--error {
+  border-color: #d5b273;
+}
+
+.integration-health > span,
+.integration-health p {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .dashboard-main {
   max-width: 1800px;
   margin: 0 auto;
@@ -2027,10 +2099,6 @@ button {
     width: 38px;
     height: 38px;
     border-radius: 12px;
-  }
-
-  .connection-pill {
-    display: none;
   }
 
   .orientation-selector {

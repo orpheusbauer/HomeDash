@@ -1,7 +1,12 @@
-export const HOURLY_WIDGET_REFRESH_MS = 60 * 60_000;
+import { CALENDAR_REFRESH_MS, WEATHER_REFRESH_MS } from '@homedash/contracts';
 
-export const hourlyWidgetRefresh = {
-  staleTime: HOURLY_WIDGET_REFRESH_MS,
-  refetchInterval: HOURLY_WIDGET_REFRESH_MS,
+const refreshOptions = (interval: number) => ({
+  staleTime: interval,
+  refetchInterval: interval,
   refetchIntervalInBackground: true,
-} as const;
+  refetchOnMount: 'always' as const,
+  networkMode: 'always' as const,
+});
+
+export const weatherWidgetRefresh = refreshOptions(WEATHER_REFRESH_MS);
+export const calendarWidgetRefresh = refreshOptions(CALENDAR_REFRESH_MS);

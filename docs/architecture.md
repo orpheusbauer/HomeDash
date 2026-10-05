@@ -75,6 +75,10 @@ Le serveur Fastify n’écoute jamais directement sur toutes les interfaces.
 
 ## Données
 
+Depuis 0.4.11, un collecteur serveur parcourt toutes les pages au démarrage puis vérifie les échéances toutes les trente secondes : météo dix minutes, Calendar cinq minutes, nouvelles tentatives après une minute en cas de panne. Les demandes identiques sont partagées et le cycle de fond est séquentiel. L’API `/api/v1/connection` expose les dernières collectes/tentatives et l’état du timer, sans appeler les fournisseurs. La tablette sonde l’API toutes les trente secondes et au réveil ; le WebSocket émet un heartbeat toutes les vingt secondes.
+
+Le navigateur conserve un maximum de 32 ensembles météo/agendas validés dans son stockage local, en plus du bootstrap. Les valeurs restaurées sont marquées périmées et conservent leur date de récupération ; les erreurs de liaison s’affichent indépendamment de la santé des fournisseurs.
+
 SQLite contient pages, instances de widgets, historiques de layout, notes, capteurs, cache externe, paramètres et tablettes. WAL, clés étrangères et délai d’attente sont activés. Les écritures de layout et notes utilisent une révision optimiste.
 
 Chemins :
@@ -96,11 +100,13 @@ Les mises à jour arrêtent le processus avant la sauvegarde afin de produire un
 /opt/homedash/releases/0.4.1
 /opt/homedash/releases/0.4.5
 /opt/homedash/releases/0.4.7
-/opt/homedash/releases/0.4.10
-/opt/homedash/current -> /opt/homedash/releases/0.4.10
+/opt/homedash/releases/0.4.11
+/opt/homedash/current -> /opt/homedash/releases/0.4.11
 ```
 
 L’updater natif télécharge et prépare une nouvelle release sans toucher à l’active. Après sauvegarde, il remplace atomiquement le lien `current`, démarre et sonde la santé. En cas d’échec, il restaure la base et le lien précédent.
+
+Après la migration système 0.4.11, le script d’update et le reboot nocturne partagent `/run/homedash-maintenance.lock`. Le timer `homedash-nightly-reboot.timer` programme 03:00 Europe/Paris ; une maintenance en cours fait ignorer cette nuit. L’archive contient les fichiers de maintenance, installés par l’updater privilégié après un contrôle de santé réussi. Une désactivation du timer est préservée. Le serveur Web reste sans droits de reboot.
 
 Depuis 0.4.0, un agent `systemd` séparé, exécuté avec les privilèges nécessaires, accepte uniquement un manifeste de release natif strict sur un socket Unix protégé par un secret local. Le serveur web ne reçoit aucun droit `sudo` et ne peut demander ni commande arbitraire, ni URL de téléchargement libre. L’interface peut ainsi lancer une release HomeDash publiée, puis suivre son état, sans exposer un shell privilégié.
 

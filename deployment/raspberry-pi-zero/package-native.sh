@@ -42,6 +42,13 @@ cp -R "${PROJECT_ROOT}/apps/server/dist" "${stage}/apps/server/"
 cp -R "${PROJECT_ROOT}/apps/web/dist" "${stage}/apps/web/"
 cp -R "${PROJECT_ROOT}/packages/contracts/dist" "${stage}/packages/contracts/"
 
+# Privileged maintenance migration is applied by the updater after a healthy rollout.
+mkdir -p "${stage}/deployment/raspberry-pi-zero"
+for maintenance_file in install-reliability.sh update-native.sh homedash-nightly-reboot \
+  homedash-nightly-reboot.service homedash-nightly-reboot.timer 60-homedash-journal.conf; do
+  cp "${PROJECT_ROOT}/deployment/raspberry-pi-zero/${maintenance_file}" "${stage}/deployment/raspberry-pi-zero/"
+done
+
 archive="homedash-native-${VERSION_VALUE}.tar.gz"
 tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
   -C "${stage}" -cf - . | gzip -n > "${OUTPUT_DIRECTORY}/${archive}"

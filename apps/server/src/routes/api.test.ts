@@ -42,6 +42,14 @@ describe('API HomeDash', () => {
     expect(bootstrap.json<{ widgets: unknown[] }>().widgets.length).toBeGreaterThanOrEqual(8);
   });
 
+  it('expose le diagnostic local sans cache HTTP ni appel aux fournisseurs', async () => {
+    const { connectionHealthSchema } = await import('@homedash/contracts');
+    const response = await app.inject({ method: 'GET', url: '/api/v1/connection' });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(connectionHealthSchema.safeParse(response.json()).success).toBe(true);
+  });
+
   it('protège les changements de page', async () => {
     const denied = await app.inject({
       method: 'POST',

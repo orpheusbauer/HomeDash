@@ -23,8 +23,8 @@ android {
         applicationId = "io.homedash.kiosk"
         minSdk = 29
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.4.10"
+        versionCode = 18
+        versionName = "0.4.11"
     }
     buildFeatures { buildConfig = true }
     signingConfigs {

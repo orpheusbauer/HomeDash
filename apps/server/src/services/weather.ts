@@ -1,8 +1,13 @@
-import type { WeatherData } from '@homedash/contracts';
+import { WEATHER_REFRESH_MS, type WeatherData } from '@homedash/contracts';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { AppError } from '../errors.js';
 import { getCache, setCache } from '../repositories/dashboard.js';
+import {
+  integrationRetryPending,
+  recordIntegrationAttempt,
+  recordIntegrationResult,
+} from './integration-status.js';
 
 const openMeteoSchema = z.object({
   latitude: z.number(),
@@ -72,17 +77,35 @@ function mapResponse(location: string, data: z.infer<typeof openMeteoSchema>): W
 
 const pendingWeather = new Map<string, Promise<WeatherData>>();
 
+export function weatherCacheKey(latitude: number, longitude: number): string {
+  return `weather:v2:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+}
+
 export async function getWeather(
   location: string,
   latitude: number,
   longitude: number,
   refresh = false,
 ): Promise<WeatherData> {
-  const cacheKey = `weather:v2:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
+  const cacheKey = weatherCacheKey(latitude, longitude);
   const pending = pendingWeather.get(cacheKey);
   if (pending) return { ...(await pending), location };
   const cached = getCache<WeatherData>(cacheKey);
-  if (!refresh && cached && !cached.expired) return { ...cached.payload, location, stale: false };
+  if (integrationRetryPending(cacheKey)) {
+    if (cached) return { ...cached.payload, location, stale: true };
+    throw new AppError(
+      503,
+      'WEATHER_UNAVAILABLE',
+      'Open-Meteo est indisponible. Nouvelle tentative dans une minute.',
+    );
+  }
+  if (
+    !refresh &&
+    cached &&
+    !cached.expired &&
+    Date.now() - Date.parse(cached.payload.fetchedAt) < WEATHER_REFRESH_MS
+  )
+    return { ...cached.payload, location, stale: false };
 
   const request = fetchWeather(location, latitude, longitude, cacheKey, cached?.payload);
   pendingWeather.set(cacheKey, request);
@@ -100,6 +123,7 @@ async function fetchWeather(
   cacheKey: string,
   cached: WeatherData | undefined,
 ): Promise<WeatherData> {
+  recordIntegrationAttempt(cacheKey);
   const params = new URLSearchParams({
     latitude: String(latitude),
     longitude: String(longitude),
@@ -118,9 +142,14 @@ async function fetchWeather(
     if (!response.ok) throw new Error(`Open-Meteo ${response.status}`);
     const data = openMeteoSchema.parse(await response.json());
     const weather = mapResponse(location, data);
-    setCache(cacheKey, weather, 15 * 60_000);
+    setCache(cacheKey, weather, WEATHER_REFRESH_MS);
+    recordIntegrationResult(cacheKey, null);
     return weather;
   } catch (error) {
+    recordIntegrationResult(
+      cacheKey,
+      'Le Pi ne parvient pas à récupérer la météo auprès d’Open-Meteo. Vérifiez son accès Internet.',
+    );
     if (cached) return { ...cached, location, stale: true };
     throw new AppError(
       503,

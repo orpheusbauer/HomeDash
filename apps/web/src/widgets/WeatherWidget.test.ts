@@ -5,7 +5,7 @@ import type { WeatherData } from '@homedash/contracts';
 import { temperatureColor } from './TemperatureTrendChart';
 import { HOURLY_FORECAST_HOURS, responsiveItemCount, upcomingHours } from './WeatherWidget';
 import { WeatherIcon } from './shared';
-import { HOURLY_WIDGET_REFRESH_MS, hourlyWidgetRefresh } from '../widget-refresh';
+import { weatherWidgetRefresh, calendarWidgetRefresh } from '../widget-refresh';
 
 const hour = (time: string, isDay = true): WeatherData['hourly'][number] => ({
   time,
@@ -57,13 +57,11 @@ describe('widget météo', () => {
     expect(temperatureColor(10)).not.toBe(temperatureColor(35));
   });
 
-  it('rafraîchit les sources externes toutes les heures, même en arrière-plan', () => {
-    expect(HOURLY_WIDGET_REFRESH_MS).toBe(3_600_000);
-    expect(hourlyWidgetRefresh).toEqual({
-      staleTime: 3_600_000,
-      refetchInterval: 3_600_000,
-      refetchIntervalInBackground: true,
-    });
+  it('actualise la météo en dix minutes et le calendrier en cinq, même en arrière-plan', () => {
+    expect(weatherWidgetRefresh.refetchInterval).toBe(600_000);
+    expect(calendarWidgetRefresh.refetchInterval).toBe(300_000);
+    expect(weatherWidgetRefresh.refetchIntervalInBackground).toBe(true);
+    expect(calendarWidgetRefresh.refetchIntervalInBackground).toBe(true);
   });
 
   it('affiche une lune pour un ciel dégagé pendant la nuit locale', () => {

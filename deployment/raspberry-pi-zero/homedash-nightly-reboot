@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Do not catch up a missed night by rebooting during the day (clock corrections included).
+if [[ "$(TZ=Europe/Paris date +%H)" != 03 ]]; then
+  echo "Redémarrage ignoré : hors du créneau de 03 h Europe/Paris."
+  exit 0
+fi
+
+# Shared with the privileged updater. Never interrupt download/install/rollback.
+exec 9>/run/homedash-maintenance.lock
+if ! flock --nonblock 9; then
+  echo "Redémarrage ignoré cette nuit : une maintenance HomeDash est en cours."
+  exit 0
+fi
+
+echo "Redémarrage quotidien HomeDash à 03 h Europe/Paris."
+systemctl reboot

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarClock, Clock3, Link2Off, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
-import type { CalendarEvent } from '@homedash/contracts';
+import { CALENDAR_REFRESH_MS, type CalendarData, type CalendarEvent } from '@homedash/contracts';
 import { api } from '../api';
 import { StatusBadge } from '../components/StatusBadge';
 import { Modal } from '../components/Modal';
@@ -13,8 +13,11 @@ import {
   calendarRelativeDay,
   groupCalendarEvents,
 } from './calendar-display';
-import { hourlyWidgetRefresh } from '../widget-refresh';
+import { calendarWidgetRefresh } from '../widget-refresh';
 import { useCurrentTime } from '../use-current-time';
+import { dashboardRefreshGeneration } from '../dashboard-refresh';
+import { readWidgetCache, saveWidgetCache } from '../widget-cache';
+import { DataFreshness, dataTimestamp } from '../components/DataFreshness';
 
 interface CalendarInfo {
   id: string;
@@ -34,28 +37,45 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
   const now = useCurrentTime();
   const [edited, setEdited] = useState<CalendarEvent | 'new' | null>(null);
   const [expandedEventKey, setExpandedEventKey] = useState<string | null>(null);
-  const calendarIds = Array.isArray(instance.config.calendarIds)
-    ? instance.config.calendarIds.filter((id): id is string => typeof id === 'string')
-    : ['primary'];
+  const selectedIds = Array.isArray(instance.config.calendarIds)
+    ? instance.config.calendarIds
+        .filter((id): id is string => typeof id === 'string')
+        .map((id) => id.trim())
+        .filter(Boolean)
+    : [];
+  const calendarIds = [...new Set(selectedIds.length ? selectedIds : ['primary'])].sort();
+  const lastGeneration = useRef(-1);
+  const cacheKey = `calendar:${JSON.stringify(calendarIds)}:14`;
   const statusQuery = useQuery({
     queryKey: ['calendar-status'],
-    queryFn: () => api<{ configured: boolean }>('/api/v1/calendar/status'),
-    ...hourlyWidgetRefresh,
+    queryFn: ({ signal }) =>
+      api<{ configured: boolean }>('/api/v1/calendar/status', { signal, cache: 'no-store' }),
+    ...calendarWidgetRefresh,
   });
   const calendarsQuery = useQuery({
     queryKey: ['calendar-list'],
-    queryFn: () => api<CalendarInfo[]>('/api/v1/calendar/calendars'),
+    queryFn: ({ signal }) =>
+      api<CalendarInfo[]>('/api/v1/calendar/calendars', { signal, cache: 'no-store' }),
     enabled: statusQuery.data?.configured === true && calendarIds.length > 1,
-    ...hourlyWidgetRefresh,
+    ...calendarWidgetRefresh,
   });
   const eventsQuery = useQuery({
     queryKey: ['calendar-events', calendarIds],
-    queryFn: () =>
-      api<{ events: CalendarEvent[]; stale: boolean; fetchedAt: string }>(
-        `/api/v1/calendar/events?calendarIds=${encodeURIComponent(calendarIds.join(','))}&days=14`,
-      ),
+    queryFn: async ({ signal }) => {
+      const generation = dashboardRefreshGeneration();
+      const refresh = lastGeneration.current !== generation;
+      lastGeneration.current = generation;
+      const data = await api<CalendarData>(
+        `/api/v1/calendar/events?calendarIds=${encodeURIComponent(calendarIds.join(','))}&days=14&refresh=${refresh}`,
+        { signal, cache: 'no-store' },
+      );
+      saveWidgetCache(cacheKey, data);
+      return data;
+    },
     enabled: statusQuery.data?.configured === true,
-    ...hourlyWidgetRefresh,
+    initialData: () => readWidgetCache<CalendarData>(cacheKey, 'calendar'),
+    initialDataUpdatedAt: 0,
+    ...calendarWidgetRefresh,
   });
   const saveEvent = useMutation({
     mutationFn: async (values: { title: string; start: string; end: string; location: string }) => {
@@ -206,7 +226,16 @@ export function CalendarWidget({ instance, editing, adminUnlocked }: WidgetCompo
           })}
         </div>
       )}
-      <StatusBadge status={eventsQuery.data.stale ? 'stale' : 'ready'} />
+      <p className="widget-footnote">
+        Collecté sur le Pi : {dataTimestamp(eventsQuery.data.fetchedAt)}
+      </p>
+      <DataFreshness
+        fetchedAt={eventsQuery.data.fetchedAt}
+        stale={eventsQuery.data.stale}
+        error={eventsQuery.error ?? statusQuery.error}
+        interval={CALENDAR_REFRESH_MS}
+        source="Google Calendar"
+      />
       {edited && (
         <CalendarEventDialog
           event={edited}

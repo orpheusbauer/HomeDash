@@ -7,7 +7,11 @@ import { StatusBadge } from '../components/StatusBadge';
 import { WeatherIcon, weatherLabel } from './shared';
 import { TemperatureTrendChart } from './TemperatureTrendChart';
 import type { WidgetComponentProps } from './types';
-import { hourlyWidgetRefresh } from '../widget-refresh';
+import { weatherWidgetRefresh } from '../widget-refresh';
+import { WEATHER_REFRESH_MS } from '@homedash/contracts';
+import { readWidgetCache, saveWidgetCache } from '../widget-cache';
+import { dashboardRefreshGeneration } from '../dashboard-refresh';
+import { DataFreshness } from '../components/DataFreshness';
 import { useCurrentTime, weatherLocalTime } from '../use-current-time';
 
 const WEATHER_ITEM_GAP = 7;
@@ -57,15 +61,27 @@ function weatherParams(config: Record<string, unknown>) {
 
 function useWeather(config: Record<string, unknown>) {
   const params = weatherParams(config);
+  const lastGeneration = useRef(-1);
+  const cacheKey = `weather:${params.latitude.toFixed(4)}:${params.longitude.toFixed(4)}`;
   return useQuery({
     queryKey: ['weather', params],
-    queryFn: ({ signal }) =>
-      api<WeatherData>(
-        `/api/v1/weather?${new URLSearchParams({ ...params, latitude: String(params.latitude), longitude: String(params.longitude), refresh: 'true' })}`,
+    queryFn: async ({ signal }) => {
+      const generation = dashboardRefreshGeneration();
+      const refresh = lastGeneration.current !== generation;
+      lastGeneration.current = generation;
+      const data = await api<WeatherData>(
+        `/api/v1/weather?${new URLSearchParams({ ...params, latitude: String(params.latitude), longitude: String(params.longitude), refresh: String(refresh) })}`,
         { signal, cache: 'no-store' },
-      ),
-    ...hourlyWidgetRefresh,
-    refetchOnMount: 'always',
+      );
+      saveWidgetCache(cacheKey, data);
+      return data;
+    },
+    initialData: () => {
+      const cached = readWidgetCache<WeatherData>(cacheKey, 'weather');
+      return cached ? { ...cached, location: params.location } : undefined;
+    },
+    initialDataUpdatedAt: 0,
+    ...weatherWidgetRefresh,
   });
 }
 
@@ -140,7 +156,13 @@ export function CurrentWeatherWidget({ instance }: WidgetComponentProps) {
           })}
         </span>
       </div>
-      <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
+      <DataFreshness
+        fetchedAt={weather.fetchedAt}
+        stale={weather.stale}
+        error={query.error}
+        interval={WEATHER_REFRESH_MS}
+        source="Open-Meteo"
+      />
     </div>
   );
 }
@@ -187,7 +209,18 @@ export function ForecastWeatherWidget({ instance }: WidgetComponentProps) {
           temperature: day.temperatureMax,
         }))}
       />
-      <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
+      {days.length === 0 && (
+        <p className="form-hint">
+          Prévisions expirées. Dernière météo conservée dans le widget Météo actuelle.
+        </p>
+      )}
+      <DataFreshness
+        fetchedAt={weather.fetchedAt}
+        stale={weather.stale}
+        error={query.error}
+        interval={WEATHER_REFRESH_MS}
+        source="Open-Meteo"
+      />
     </div>
   );
 }
@@ -268,7 +301,13 @@ export function HourlyWeatherWidget({ instance }: WidgetComponentProps) {
         }))}
       />
       {hours.length === 0 && <p className="form-hint">Prévisions récentes indisponibles.</p>}
-      <StatusBadge status={weather.stale ? 'stale' : 'ready'} />
+      <DataFreshness
+        fetchedAt={weather.fetchedAt}
+        stale={weather.stale}
+        error={query.error}
+        interval={WEATHER_REFRESH_MS}
+        source="Open-Meteo"
+      />
     </div>
   );
 }

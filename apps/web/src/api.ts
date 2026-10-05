@@ -39,36 +39,48 @@ export async function api<T>(
   path: string,
   init: RequestInit = {},
   requiresAdmin = false,
+  timeoutMs = 30_000,
 ): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...(requiresAdmin && adminSession ? { 'X-HomeDash-Admin': adminSession } : {}),
-      ...init.headers,
-    },
-  });
-  if (!response.ok) {
-    if (requiresAdmin && response.status === 401) {
-      setAdminSession('');
-      window.dispatchEvent(new Event('homedash:admin-locked'));
+  const controller = new AbortController();
+  const abort = () => controller.abort(init.signal?.reason);
+  if (init.signal?.aborted) abort();
+  else init.signal?.addEventListener('abort', abort, { once: true });
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(path, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(requiresAdmin && adminSession ? { 'X-HomeDash-Admin': adminSession } : {}),
+        ...init.headers,
+      },
+    });
+    if (!response.ok) {
+      if (requiresAdmin && response.status === 401) {
+        setAdminSession('');
+        window.dispatchEvent(new Event('homedash:admin-locked'));
+      }
+      let payload: ApiErrorPayload | undefined;
+      try {
+        payload = (await response.json()) as ApiErrorPayload;
+      } catch {
+        // Network intermediaries do not always return JSON.
+      }
+      throw new ApiError(
+        response.status,
+        payload?.error.code ?? 'HTTP_ERROR',
+        payload?.error.message ?? `Erreur HTTP ${response.status}`,
+        payload?.error.details,
+      );
     }
-    let payload: ApiErrorPayload | undefined;
-    try {
-      payload = (await response.json()) as ApiErrorPayload;
-    } catch {
-      // Network intermediaries do not always return JSON.
-    }
-    throw new ApiError(
-      response.status,
-      payload?.error.code ?? 'HTTP_ERROR',
-      payload?.error.message ?? `Erreur HTTP ${response.status}`,
-      payload?.error.details,
-    );
+    if (response.status === 204) return undefined as T;
+    return (await response.json()) as T;
+  } finally {
+    clearTimeout(timeout);
+    init.signal?.removeEventListener('abort', abort);
   }
-  if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
 }
 
 export async function unlockAdmin(pin: string): Promise<boolean> {

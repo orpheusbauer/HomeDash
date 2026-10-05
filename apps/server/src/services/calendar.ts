@@ -1,8 +1,13 @@
-import type { CalendarEvent } from '@homedash/contracts';
+import { CALENDAR_REFRESH_MS, type CalendarData, type CalendarEvent } from '@homedash/contracts';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { AppError } from '../errors.js';
 import { deleteCacheByPrefix, getCache, setCache } from '../repositories/dashboard.js';
+import {
+  integrationRetryPending,
+  recordIntegrationAttempt,
+  recordIntegrationResult,
+} from './integration-status.js';
 
 const calendarListSchema = z.object({
   items: z
@@ -32,6 +37,7 @@ const googleEventSchema = z.object({
 const eventListSchema = z.object({ items: z.array(googleEventSchema).default([]) });
 
 let accessTokenCache: { token: string; expiresAt: number } | undefined;
+let pendingToken: Promise<string> | undefined;
 
 function isConfigured(): boolean {
   return Boolean(
@@ -42,6 +48,16 @@ function isConfigured(): boolean {
 }
 
 async function accessToken(): Promise<string> {
+  if (pendingToken) return pendingToken;
+  pendingToken = fetchAccessToken();
+  try {
+    return await pendingToken;
+  } finally {
+    pendingToken = undefined;
+  }
+}
+
+async function fetchAccessToken(): Promise<string> {
   if (!isConfigured()) {
     throw new AppError(
       503,
@@ -142,11 +158,55 @@ export async function listCalendars(): Promise<
 export async function listEvents(
   calendarIds: string[],
   days: number,
-): Promise<{ events: CalendarEvent[]; stale: boolean; fetchedAt: string }> {
-  const selected = calendarIds.length > 0 ? calendarIds : ['primary'];
-  const cacheKey = `calendar:events:${selected.sort().join(',')}:${days}`;
+  refresh = false,
+): Promise<CalendarData> {
+  const selected = normalizeCalendarIds(calendarIds);
+  const cacheKey = calendarCacheKey(selected, days);
+  const pending = pendingEvents.get(cacheKey);
+  if (pending) return pending;
   const cached = getCache<{ events: CalendarEvent[]; fetchedAt: string }>(cacheKey);
-  if (cached && !cached.expired) return { ...cached.payload, stale: false };
+  if (integrationRetryPending(cacheKey)) {
+    if (cached) return { ...cached.payload, stale: true };
+    throw new AppError(
+      503,
+      'CALENDAR_UNAVAILABLE',
+      'Google Calendar est indisponible. Nouvelle tentative dans une minute.',
+    );
+  }
+  if (
+    !refresh &&
+    cached &&
+    !cached.expired &&
+    Date.now() - Date.parse(cached.payload.fetchedAt) < CALENDAR_REFRESH_MS
+  )
+    return { ...cached.payload, stale: false };
+  const request = fetchEvents(selected, days, cacheKey, cached?.payload);
+  pendingEvents.set(cacheKey, request);
+  try {
+    return await request;
+  } finally {
+    pendingEvents.delete(cacheKey);
+  }
+}
+
+const pendingEvents = new Map<string, Promise<CalendarData>>();
+
+export function normalizeCalendarIds(ids: string[]): string[] {
+  const selected = [...new Set(ids.map((id) => id.trim()).filter(Boolean))].sort();
+  return selected.length ? selected : ['primary'];
+}
+
+export function calendarCacheKey(ids: string[], days: number): string {
+  return `calendar:events:${normalizeCalendarIds(ids).join(',')}:${days}`;
+}
+
+async function fetchEvents(
+  selected: string[],
+  days: number,
+  cacheKey: string,
+  cached: { events: CalendarEvent[]; fetchedAt: string } | undefined,
+): Promise<CalendarData> {
+  recordIntegrationAttempt(cacheKey);
   try {
     const timeMin = new Date().toISOString();
     const timeMax = new Date(Date.now() + days * 86_400_000).toISOString();
@@ -170,10 +230,17 @@ export async function listEvents(
       events: chunks.flat().sort((a, b) => a.start.localeCompare(b.start)),
       fetchedAt: new Date().toISOString(),
     };
-    setCache(cacheKey, payload, 5 * 60_000);
+    setCache(cacheKey, payload, CALENDAR_REFRESH_MS);
+    recordIntegrationResult(cacheKey, null);
     return { ...payload, stale: false };
   } catch (error) {
-    if (cached) return { ...cached.payload, stale: true };
+    recordIntegrationResult(
+      cacheKey,
+      error instanceof AppError
+        ? error.message
+        : 'Le Pi ne parvient pas à joindre Google Calendar. Vérifiez son accès Internet.',
+    );
+    if (cached) return { ...cached, stale: true };
     throw error;
   }
 }

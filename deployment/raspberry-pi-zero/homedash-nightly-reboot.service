@@ -1,0 +1,12 @@
+[Unit]
+Description=HomeDash scheduled Raspberry Pi reboot
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/homedash-nightly-reboot
+TimeoutStartSec=30
+LimitCORE=0
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=homedash-nightly-reboot

@@ -4,7 +4,7 @@ HomeDash est un dashboard domestique local-first destiné à un Raspberry Pi et 
 
 ## État du projet
 
-La version `0.4.10` fournit déjà :
+La version `0.4.11` fournit déjà :
 
 - une grille tactile responsive à 48 colonnes avec redimensionnement fin, ajout, configuration et suppression de widgets ;
 - des pages persistantes avec historique et annulation de la dernière disposition ;
@@ -34,9 +34,10 @@ La version `0.4.10` fournit déjà :
 - indicateur jour/nuit fourni par Open-Meteo pour chaque prévision horaire et icône de lune par ciel dégagé nocturne (0.4.8) ;
 - événements Google Calendar compacts dont les détails s’ouvrent en touchant toute la carte, sans bouton « Description » (0.4.9) ;
 - prévisions météo horaires sur 24 heures, défilables horizontalement avec des cartes entières quelle que soit la largeur du widget (0.4.9) ;
-- actualisation immédiate des widgets au retour à l’application et au réveil Android, récupération de nouvelles données Open-Meteo et recalage des prévisions sur l’heure réelle du lieu (0.4.10).
+- actualisation immédiate des widgets au retour à l’application et au réveil Android, récupération de nouvelles données Open-Meteo et recalage des prévisions sur l’heure réelle du lieu (0.4.10) ;
+- collecte autonome sur le Pi, toutes les dix minutes pour la météo et cinq minutes pour Calendar, diagnostic visible de la liaison tablette/Pi et des fournisseurs, reprise des sockets interrompues, cache tablette daté et redémarrage quotidien à 03 h Europe/Paris (0.4.11).
 
-La release **0.4.10** rafraîchit les widgets dès le réveil ou le retour à HomeDash. La météo horaire se recale immédiatement sur l’heure réelle, puis récupère de nouvelles données via le fournisseur existant Open-Meteo. Mettre à jour le serveur puis l’APK signée **0.4.10 / versionCode 17**. Les [notes 0.4.10](docs/releases/0.4.10.md) détaillent tous les changements. Si l’installeur du Pi date d’avant **0.4.5**, appliquez une fois l’installeur complet de la release actuelle pour bénéficier du correctif du cache npm. Voir la procédure de réparation dans [le guide des mises à jour](docs/updates.md).
+La release **0.4.11** surveille la liaison tablette/Pi, affiche les dernières collectes et actualise les données même lorsque la tablette dort. Mettre à jour le serveur puis l’APK signée **0.4.11 / versionCode 18**. Sur un Pi existant, activer une fois le timer système de **03 h Europe/Paris** avec la migration décrite dans [le guide des mises à jour](docs/updates.md). Les [notes 0.4.11](docs/releases/0.4.11.md) détaillent tous les changements. Si l’installeur du Pi date d’avant **0.4.5**, utiliser l’installeur complet actuel.
 
 Les limites matérielles qui doivent encore être validées sur la tablette qunyiCO Y10 sont suivies dans [remaining-work.md](docs/remaining-work.md).
 
@@ -71,6 +72,7 @@ npm run build
 - [Capteurs HTTP et ESP32](docs/sensors.md)
 - [Mises à jour et releases](docs/updates.md)
 - [Diagnostic des crash loops et core dumps](docs/crash-loop-recovery.md)
+- [Diagnostic d'un Pi qui disparaît du réseau](docs/pi-network-freeze-diagnostic.md)
 - [Sauvegarde et restauration](docs/backup-and-restore.md)
 - [Créer un widget](docs/creating-a-widget.md)
 - [Architecture et sécurité](docs/architecture.md)
