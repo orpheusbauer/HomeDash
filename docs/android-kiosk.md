@@ -317,6 +317,16 @@ Gardez le PC et la tablette devant vous pendant cette étape.
 
 Le code d’association expire après dix minutes et ne fonctionne qu’une fois. Il n’est plus nécessaire lors des ouvertures suivantes.
 
+### Si « Enregistrer et ouvrir HomeDash » reste grisé sur l’APK 0.4.12
+
+Sur cette APK, la requête d’association n’a pas de délai réseau configuré et les erreurs sont affichées uniquement dans un message temporaire. Une connexion qui reste en attente peut donc laisser le bouton grisé sans explication. Cela ne permet pas, à lui seul, de conclure que le code est incorrect ou que le Pi est arrêté.
+
+**[TABLETTE — Android 10]** Testez d’abord l’adresse complète `https://ADRESSE_IP_DU_PI` dans Chrome. Si le dashboard s’ouvre sans avertissement de certificat, utilisez cette même adresse HTTPS dans HomeDash. Le fonctionnement de `homedash.local` sur le PC ne garantit pas sa résolution sur Android 10. Si Chrome affiche un avertissement, vérifiez le certificat d’autorité installé dans Android et l’adresse couverte par le certificat, selon la section 5.
+
+**[PC]** Après une désinstallation, générez un nouveau code dans **Paramètres > Tablettes > Associer une tablette**. Le code expire après dix minutes et est consommé dès qu’une association réussit côté serveur. Si une tentative a été interrompue avant son enregistrement sur la tablette, générez également un nouveau code. Une fois le dashboard ouvert et la nouvelle tablette visible sur le PC, l’association est terminée.
+
+Le correctif préparé pour la prochaine APK ajoute un état visible pendant la recherche et l’association, une limite de trente secondes pour la tentative et un message d’erreur persistant avec possibilité de réessayer. Les connexions HTTP ont aussi des délais de connexion et de lecture de dix secondes. Android 10/11 essaient la découverte mDNS avant le DNS ordinaire pour les noms `.local`. Le formulaire devient défilable pour garder le diagnostic accessible avec le clavier ou en portrait. Ces changements ne sont pas présents dans l’APK `0.4.12` déjà publiée.
+
 ## 7. Choisir portrait ou paysage depuis le dashboard
 
 Sur la tablette :

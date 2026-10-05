@@ -35,6 +35,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -50,8 +51,12 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -251,11 +256,14 @@ class MainActivity : ComponentActivity() {
         webView = null
     }
 
-    private suspend fun resolveAddress(address: String): String = withContext(Dispatchers.IO) {
+    private suspend fun resolveAddress(address: String): String {
         val normalized = normalizeServerAddress(address, BuildConfig.DEBUG)
-        try {
-            resolveServerAddress(normalized)
+        return try {
+            runSetupIo(8_000) {
+                resolveServerAddress(normalized, preferMulticast = Build.VERSION.SDK_INT < Build.VERSION_CODES.S)
+            }
         } catch (error: Exception) {
+            currentCoroutineContext().ensureActive()
             // Retain offline access to the last known Pi when multicast is temporarily unavailable.
             if (preferences.getString(KEY_SERVER_ADDRESS, null) == normalized) {
                 preferences.getString(KEY_SERVER_URL, null) ?: throw error
@@ -301,6 +309,8 @@ class MainActivity : ComponentActivity() {
                     .putString(KEY_SERVER_URL, resolved)
                     .apply()
                 showDashboard(resolved)
+            } catch (error: TimeoutCancellationException) {
+                status.text = setupErrorMessage(error)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -462,6 +472,11 @@ class MainActivity : ComponentActivity() {
             },
         )
         val button = Button(this).apply { text = "Enregistrer et ouvrir HomeDash" }
+        val status = TextView(this).apply {
+            gravity = Gravity.CENTER
+            visibility = View.GONE
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
         val autoScreenOffButton =
             Button(this).apply {
                 text =
@@ -475,7 +490,8 @@ class MainActivity : ComponentActivity() {
         val help =
             TextView(this).apply {
                 text =
-                    "Le code d’association n’est nécessaire qu’une fois. " +
+                    "Après une désinstallation, générez un nouveau code d’association sur le PC. " +
+                    "Ce code est valable dix minutes et n’est utilisable qu’une fois. " +
                     "L’orientation reste ensuite modifiable dans Paramètres > Affichage tablette. " +
                     "Le délai de veille Android reste toujours prioritaire. L’extinction après absence " +
                     "est facultative et peut verrouiller l’écran plus tôt."
@@ -488,6 +504,7 @@ class MainActivity : ComponentActivity() {
             name,
             orientationTitle,
             orientationGroup,
+            status,
             button,
             autoScreenOffButton,
             exitButton,
@@ -501,7 +518,10 @@ class MainActivity : ComponentActivity() {
                 ).apply { setMargins(0, 8, 0, 8) },
             )
         }
-        setContentView(layout)
+        setContentView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(layout)
+        })
         hideSystemBars()
         exitButton.setOnClickListener { exitToAndroid() }
         autoScreenOffButton.setOnClickListener {
@@ -538,38 +558,64 @@ class MainActivity : ComponentActivity() {
                 url.error = error.message
                 return@setOnClickListener
             }
+            val pairingCode = code.text.toString().trim()
+            if (pairingCode.isNotEmpty() && !Regex("^[0-9]{6}$").matches(pairingCode)) {
+                code.error = "Recopiez les six chiffres du code d’association."
+                return@setOnClickListener
+            }
+            val tabletName = name.text.toString().trim().ifBlank { "Tablette HomeDash" }
+            if (tabletName.length > 80) {
+                name.error = "Le nom de la tablette doit contenir au plus 80 caractères."
+                return@setOnClickListener
+            }
             val selectedOrientation =
                 if (orientationGroup.checkedRadioButtonId == portrait.id) {
                     ORIENTATION_PORTRAIT
                 } else {
                     ORIENTATION_LANDSCAPE
                 }
-            button.isEnabled = false
+            val inputs = listOf(url, code, name, landscape, portrait, button, autoScreenOffButton)
+            inputs.forEach { it.isEnabled = false }
+            button.text = "Connexion en cours…"
+            status.text = "Recherche du Raspberry Pi…"
+            status.visibility = View.VISIBLE
             dashboardConnection = lifecycleScope.launch {
                 try {
-                    val resolved = resolveAddress(normalized)
-                    if (code.text.isNotBlank()) {
-                        pair(
-                            resolved,
-                            code.text.toString(),
-                            name.text.toString().ifBlank { "Tablette HomeDash" },
-                        )
+                    val (resolved, credentials) = withTimeout(30_000) {
+                        val serverUrl = resolveAddress(normalized)
+                        status.text = if (pairingCode.isNotEmpty()) {
+                            "Association de la tablette avec HomeDash…"
+                        } else {
+                            "Ouverture du tableau de bord HomeDash…"
+                        }
+                        val credentials = if (pairingCode.isNotEmpty()) {
+                            pair(serverUrl, pairingCode, tabletName)
+                        } else {
+                            null
+                        }
+                        serverUrl to credentials
                     }
-                    preferences.edit()
+                    val editor = preferences.edit()
                         .putString(KEY_SERVER_ADDRESS, normalized)
                         .putString(KEY_SERVER_URL, resolved)
-                        .apply()
-                    setOrientation(selectedOrientation)
+                        .putString(KEY_ORIENTATION, selectedOrientation)
+                    if (credentials != null) {
+                        editor.putString(KEY_DEVICE_ID, credentials.first)
+                            .putString(KEY_DEVICE_TOKEN, credentials.second)
+                    }
+                    editor.apply()
+                    status.text = "Configuration enregistrée. Ouverture de HomeDash…"
+                    applySavedOrientation()
                     showDashboard(resolved)
+                } catch (error: TimeoutCancellationException) {
+                    status.text = setupErrorMessage(error)
                 } catch (error: CancellationException) {
                     throw error
                 } catch (error: Exception) {
-                    Toast.makeText(
-                        this@MainActivity,
-                        error.message ?: "Association impossible",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                    button.isEnabled = true
+                    status.text = setupErrorMessage(error)
+                } finally {
+                    inputs.forEach { it.isEnabled = true }
+                    button.text = "Enregistrer et ouvrir HomeDash"
                 }
             }
         }
@@ -579,24 +625,14 @@ class MainActivity : ComponentActivity() {
         serverUrl: String,
         code: String,
         name: String,
-    ) = withContext(Dispatchers.IO) {
-        val connection = URL("$serverUrl/api/v1/devices/pair").openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.setRequestProperty("Content-Type", "application/json")
-        connection.doOutput = true
-        connection.outputStream.use {
-            it.write(JSONObject().put("code", code).put("name", name).toString().toByteArray())
-        }
-        if (connection.responseCode !in 200..299) {
-            throw IllegalStateException("Code refusé (${connection.responseCode})")
-        }
-        val response = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-        preferences
-            .edit()
-            .putString("deviceId", response.getString("deviceId"))
-            .putString("deviceToken", response.getString("token"))
-            .apply()
-        connection.disconnect()
+    ): Pair<String, String> {
+        val payload = JSONObject().put("code", code).put("name", name).toString().toByteArray(Charsets.UTF_8)
+        val rawResponse = runSetupIo(25_000) { requestTabletPairing(serverUrl, payload) }
+        val response = JSONObject(rawResponse)
+        val deviceId = response.getString("deviceId")
+        val token = response.getString("token")
+        check(deviceId.isNotBlank() && token.isNotBlank()) { "Réponse d’association HomeDash invalide." }
+        return deviceId to token
     }
 
     private fun requestCameraAndStart() {

@@ -26,16 +26,24 @@ internal fun resolveServerAddress(
     address: String,
     systemLookup: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() },
     multicastLookup: (String) -> String? = ::resolveMdnsHost,
+    preferMulticast: Boolean = false,
 ): String {
     val uri = URI(address)
     val host = uri.host
     if (!host.endsWith(".local", ignoreCase = true)) return address
-    val ip = runCatching { systemLookup(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress }
-        .getOrNull() ?: multicastLookup(host)
+    fun systemAddress() = runCatching {
+        systemLookup(host).filterIsInstance<Inet4Address>().firstOrNull()?.hostAddress
+    }.getOrNull()
+    fun multicastAddress() = runCatching { multicastLookup(host) }.getOrNull()
+    // Android 10/11 often send .local to ordinary DNS, which can delay our mDNS fallback.
+    val ip = (if (preferMulticast) {
+        multicastAddress() ?: systemAddress()
+    } else {
+        systemAddress() ?: multicastAddress()
+    })
         ?: throw IllegalStateException(
             "Le nom $host est introuvable sur ce Wi-Fi. Vérifiez le nom exact du Pi ou saisissez son adresse IP dans « Adresse du serveur ».",
         )
     // The installer includes the Pi's reserved IP in its TLS certificate. TLS stays enforced.
     return URI(uri.scheme, null, ip, uri.port, null, null, null).toString()
 }
-

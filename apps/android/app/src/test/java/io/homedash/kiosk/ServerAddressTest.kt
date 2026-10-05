@@ -51,5 +51,24 @@ class ServerAddressTest {
         assertTrue(error.message!!.contains("homedash.local"))
         assertTrue(error.message!!.contains("adresse IP"))
     }
-}
 
+    @Test
+    fun `legacy Android can resolve local names without waiting for ordinary DNS`() {
+        var systemQueries = 0
+        assertEquals("https://192.0.2.10:8443", resolveServerAddress("https://homedash.local:8443",
+            systemLookup = { systemQueries += 1; throw UnknownHostException(it) },
+            multicastLookup = { "192.0.2.10" },
+            preferMulticast = true))
+        assertEquals(0, systemQueries)
+    }
+
+    @Test
+    fun `legacy Android still tries system DNS when multicast is unavailable`() {
+        val lookups = mutableListOf<String>()
+        assertEquals("https://192.0.2.10", resolveServerAddress("https://homedash.local",
+            systemLookup = { lookups.add("system"); listOf(InetAddress.getByName("192.0.2.10")) },
+            multicastLookup = { lookups.add("multicast"); throw java.io.IOException("Unavailable") },
+            preferMulticast = true))
+        assertEquals(listOf("multicast", "system"), lookups)
+    }
+}

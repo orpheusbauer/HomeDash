@@ -425,7 +425,7 @@ export function SettingsCenter({
                 <span>Installation automatique du Pi</span>
                 <strong>
                   {updates.data.automatic.enabled
-                    ? `Toutes les ${updates.data.automatic.intervalMinutes} minutes`
+                    ? `Toutes les ${updates.data.automatic.intervalMinutes} minu`
                     : 'Désactivée ou agent absent'}
                 </strong>
               </div>

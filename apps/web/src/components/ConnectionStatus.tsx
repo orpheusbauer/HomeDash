@@ -152,7 +152,7 @@ export function ConnectionDetails({
               <br />
               Dernière tentative : {dataTimestamp(item.lastAttemptAt)}
               <br />
-              Actualisation sur le Pi : toutes les {item.refreshIntervalMs / 60_000} minutes
+              Actualisation sur le Pi : toutes les {item.refreshIntervalMs / 60_000} min
             </p>
             {item.lastError && <p className="text-danger">{item.lastError}</p>}
           </article>
