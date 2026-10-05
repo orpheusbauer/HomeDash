@@ -15,6 +15,36 @@ const widgets = [
 let root: Root;
 let host: HTMLDivElement;
 const onLayoutChange = vi.fn();
+function finger(target: Element): Touch {
+  return {
+    identifier: 1,
+    target,
+    clientX: 10,
+    clientY: 10,
+    pageX: 10,
+    pageY: 10,
+    screenX: 10,
+    screenY: 10,
+    radiusX: 1,
+    radiusY: 1,
+    rotationAngle: 0,
+    force: 1,
+  };
+}
+
+async function startTouchGesture(handle: Element, touch: Touch) {
+  handle.dispatchEvent(
+    new TouchEvent('touchstart', { bubbles: true, changedTouches: [touch], touches: [touch] }),
+  );
+  // GridStack 13.3 arms touch dragging/resizing after a 300 ms press. Moving
+  // sooner is a scroll gesture. A fake clock also keeps this valid with 13.0.
+  await vi.advanceTimersByTimeAsync(350);
+  const moved = { ...touch, clientX: 210, clientY: 110, pageX: 210, pageY: 110 };
+  handle.dispatchEvent(
+    new TouchEvent('touchmove', { bubbles: true, changedTouches: [moved], touches: [moved] }),
+  );
+}
+
 async function render(editing: boolean, instances = widgets) {
   await act(async () =>
     root.render(
@@ -84,6 +114,7 @@ afterEach(async () => {
   host.remove();
   Reflect.deleteProperty(HTMLElement.prototype, 'scrollBy');
   vi.restoreAllMocks();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -145,36 +176,14 @@ describe('éditeur de grille', () => {
   it.each(['.widget-drag-handle', '.ui-resizable-se'])(
     'termine un geste tactile annulé sur %s',
     async (selector) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
       await render(true);
       const handle = host.querySelector(selector)!;
-      const touch: Touch = {
-        identifier: 1,
-        target: handle,
-        clientX: 10,
-        clientY: 10,
-        pageX: 10,
-        pageY: 10,
-        screenX: 10,
-        screenY: 10,
-        radiusX: 1,
-        radiusY: 1,
-        rotationAngle: 0,
-        force: 1,
-      };
+      const touch = finger(handle);
       const touchEnd = vi.fn();
       handle.addEventListener('touchend', touchEnd);
       await act(async () => {
-        handle.dispatchEvent(
-          new TouchEvent('touchstart', {
-            bubbles: true,
-            changedTouches: [touch],
-            touches: [touch],
-          }),
-        );
-        const moved = { ...touch, clientX: 210, clientY: 110, pageX: 210, pageY: 110 };
-        handle.dispatchEvent(
-          new TouchEvent('touchmove', { bubbles: true, changedTouches: [moved], touches: [moved] }),
-        );
+        await startTouchGesture(handle, touch);
         expect(host.querySelector('.grid-stack-placeholder')).not.toBeNull();
         handle.dispatchEvent(
           new TouchEvent('touchcancel', { bubbles: true, changedTouches: [touch] }),
@@ -186,6 +195,44 @@ describe('éditeur de grille', () => {
         grid().update('[gs-id="clock"]', { w: 7 });
       });
       expect(grid().engine.nodes.find(({ id }) => id === 'clock')?.w).toBe(7);
+    },
+  );
+
+  it.each(['.widget-drag-handle', '.ui-resizable-se'])(
+    'annule un appui avant le démarrage du geste sur %s sans bloquer le suivant',
+    async (selector) => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      await render(true);
+      const handle = host.querySelector(selector)!;
+      const touch = finger(handle);
+      const touchEnd = vi.fn();
+      handle.addEventListener('touchend', touchEnd);
+      const original = layout();
+      await act(async () => {
+        handle.dispatchEvent(
+          new TouchEvent('touchstart', {
+            bubbles: true,
+            changedTouches: [touch],
+            touches: [touch],
+          }),
+        );
+        handle.dispatchEvent(
+          new TouchEvent('touchcancel', { bubbles: true, changedTouches: [touch] }),
+        );
+        await vi.advanceTimersByTimeAsync(350);
+      });
+      expect(touchEnd).toHaveBeenCalledOnce();
+      expect(host.querySelector('.grid-stack-placeholder')).toBeNull();
+      expect(layout()).toEqual(original);
+      await act(async () => {
+        await startTouchGesture(handle, touch);
+        expect(host.querySelector('.grid-stack-placeholder')).not.toBeNull();
+        handle.dispatchEvent(
+          new TouchEvent('touchcancel', { bubbles: true, changedTouches: [touch] }),
+        );
+      });
+      expect(touchEnd).toHaveBeenCalledTimes(2);
+      expect(host.querySelector('.grid-stack-placeholder')).toBeNull();
     },
   );
 
